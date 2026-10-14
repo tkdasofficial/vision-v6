@@ -1,18 +1,5 @@
-import { Mail, Youtube, Cloud, Calendar, Github, MessageSquare, FileText, Globe, type LucideIcon } from "lucide-react";
-
-export type Plugin = { name: string; description: string; icon: LucideIcon };
-
-/** Single plugin list shared by the Plugins page and the chat "@" picker. */
-export const PLUGINS: Plugin[] = [
-  { name: "Web Search", description: "Search the web for current info", icon: Globe },
-  { name: "Gmail", description: "Read and manage email", icon: Mail },
-  { name: "YouTube", description: "Videos and channels", icon: Youtube },
-  { name: "Google Drive", description: "Drive, Docs, Sheets or Slides", icon: Cloud },
-  { name: "Google Calendar", description: "Events and schedules", icon: Calendar },
-  { name: "GitHub", description: "Repositories, issues and code", icon: Github },
-  { name: "Slack", description: "Channels and messages", icon: MessageSquare },
-  { name: "Notion", description: "Pages and workspaces", icon: FileText },
-];
+// Chat "@" picker helpers. The plugin list itself lives in ./plugins/manifest.ts.
+import type { PluginDef } from "@/lib/plugins/manifest";
 
 /** Finds an active "@query" right before the caret (start of text or after whitespace). */
 export function findMention(text: string, caret: number): { start: number; query: string } | null {
@@ -24,9 +11,15 @@ export function findMention(text: string, caret: number): { start: number; query
   return { start: before.length - query.length - 1, query };
 }
 
-export function filterPlugins(query: string): Plugin[] {
+/** Narrows the user's added plugins by what was typed after "@" (no separate search box). */
+export function filterPlugins(list: PluginDef[], query: string): PluginDef[] {
   const q = query.trim().toLowerCase();
-  return PLUGINS.filter((p) => p.name.toLowerCase().includes(q));
+  return q ? list.filter((p) => p.name.toLowerCase().includes(q) || (p.exts ?? []).some((e) => e.startsWith(q))) : list;
+}
+
+/** Removes the "@query" at start..caret (the plugin becomes a chip instead of text). */
+export function removeMention(text: string, start: number, caret: number) {
+  return { text: text.slice(0, start) + text.slice(caret).replace(/^ /, ""), caret: start };
 }
 
 /** Replaces the "@query" at start..caret with "@Name ". */

@@ -1,5 +1,6 @@
 // User preferences shared by Settings pages, the app shell and the chat server. Browser-safe.
 import type { ChatMode } from "@/lib/ai/modes";
+import { normalizeSelection } from "@/lib/plugins/manifest";
 
 export type Prefs = {
   theme: "system" | "light" | "dark";
@@ -17,13 +18,15 @@ export type Prefs = {
   largeTargets: boolean;
   notifyReplies: boolean;
   notifyResearch: boolean;
+  /** Plugins added to the chat "@" picker; null = never changed (defaults apply). */
+  plugins: string[] | null;
 };
 
 export const DEFAULT_PREFS: Prefs = {
   theme: "system", accent: "mono", fontSize: "md", defaultMode: "default",
   responseLength: "balanced", tone: "neutral", customInstructions: "", webSearch: "auto",
   codeComments: true, codeExplain: "brief", reduceMotion: false, highContrast: false,
-  largeTargets: false, notifyReplies: false, notifyResearch: true,
+  largeTargets: false, notifyReplies: false, notifyResearch: true, plugins: null,
 };
 
 export const MAX_INSTRUCTIONS = 1000;
@@ -54,6 +57,7 @@ export function parsePrefs(raw: unknown): Prefs {
     largeTargets: bool(o.largeTargets, d.largeTargets),
     notifyReplies: bool(o.notifyReplies, d.notifyReplies),
     notifyResearch: bool(o.notifyResearch, d.notifyResearch),
+    plugins: Array.isArray(o.plugins) ? normalizeSelection(o.plugins) : null,
   };
 }
 

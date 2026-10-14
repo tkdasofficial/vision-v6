@@ -79,11 +79,13 @@ export const Route = createFileRoute("/api/chat")({
         let searchUsed = "none";
         // "auto" also searches when any mode is explicitly asked for sources, so citations come from a real search, not memory.
         const { asksForSources } = await import("@/lib/ai/request-route");
-        const wantSearch = prefs.webSearch === "always" || (prefs.webSearch === "auto" && (task.executionMode === "research" || asksForSources(lastText)));
+        // The Web Search plugin forces a real retrieval for this message regardless of the auto setting.
+        const pluginSearch = body?.webSearch === true;
+        const wantSearch = pluginSearch || prefs.webSearch === "always" || (prefs.webSearch === "auto" && (task.executionMode === "research" || asksForSources(lastText)));
         if (wantSearch && lastText.trim()) {
           const { webSearch, sourcesBlock } = await import("@/lib/search/search.server");
           try {
-            const s = await webSearch(lastText, { signal: request.signal });
+            const s = await webSearch(pluginSearch ? lastText.replace(/^@Web Search\s*/i, "") : lastText, { signal: request.signal });
             searchUsed = `${s.status}:${s.used.join(",") || "none"}`;
             system += `\n\n${sourcesBlock(s.results, s.status, s.failed)}`;
           } catch (e) { console.error("[search]", e); system += "\n\nLive web search was unavailable; say so in the answer."; }

@@ -7,12 +7,12 @@ export async function streamChat(
   messages: { role: string; content: any }[],
   onText: (full: string) => void,
   toolId?: string,
-  opts: { mode?: ChatMode; onMeta?: (m: ChatMeta) => void; onStatus?: (stage: string, detail?: string) => void; signal?: AbortSignal; requestId?: string; conversationId?: string } = {},
+  opts: { mode?: ChatMode; onMeta?: (m: ChatMeta) => void; onStatus?: (stage: string, detail?: string) => void; signal?: AbortSignal; webSearch?: boolean; requestId?: string; conversationId?: string } = {},
 ): Promise<string> {
   const resp = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, toolId, mode: opts.mode ?? "default", requestId: opts.requestId, conversationId: opts.conversationId }),
+    body: JSON.stringify({ messages, toolId, mode: opts.mode ?? "default", requestId: opts.requestId, conversationId: opts.conversationId, ...(opts.webSearch ? { webSearch: true } : {}) }),
     signal: opts.signal,
   });
   if (!resp.ok || !resp.body) {

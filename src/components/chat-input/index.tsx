@@ -11,15 +11,19 @@ import ModeSelector from "@/components/mode-selector";
 import type { ChatMode } from "@/lib/ai/modes";
 import { appendTranscript } from "@/lib/append-transcript";
 import { readCachedPrefs } from "@/lib/settings";
-import { findMention, filterPlugins, insertMention } from "@/lib/plugins";
+import { findMention, filterPlugins, removeMention } from "@/lib/plugins";
+import { usePlugins } from "@/hooks/usePlugins";
+import PluginIcon from "@/components/plugin-icon";
+import { PLUGIN_BY_ID } from "@/lib/plugins/manifest";
+import { Plus } from "lucide-react";
 
 type Props = {
   toolName?: string;
-  onSend: (message: string, imageData?: { base64: string; mimeType: string }, taskMode?: ChatMode, extras?: { typed: string; pasted: PastedBlock[] }) => void;
+  onSend: (message: string, imageData?: { base64: string; mimeType: string }, taskMode?: ChatMode, extras?: { typed: string; pasted: PastedBlock[] }, plugins?: string[]) => void;
   onZipUpload?: (file: File) => void;
   onFileConvert?: (file: File) => void;
   /** Documents, data and audio go to the backend task agent together with the typed instruction. */
-  onSendFiles?: (message: string, files: File[], extras?: { typed: string; pasted: PastedBlock[] }) => void;
+  onSendFiles?: (message: string, files: File[], extras?: { typed: string; pasted: PastedBlock[] }, plugins?: string[]) => void;
   disabled?: boolean;
   /** Something is running (reply or task); the send button turns into a spinning stop button. */
   busy?: boolean;
@@ -35,7 +39,9 @@ const RemoveBtn = ({ label, onClick }: { label: string; onClick: () => void }) =
 
 const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, disabled, busy, onStop, mode, onModeChange }: Props) => {
   const [value, setValue] = useState("");
-  const [attachedImage, setAttachedImage] = useState<{ base64: string; mimeType: string; preview: string } | null>(null);
+  const [attachedImage, setAttachedImage] = useState<{ base64: string; mimeType: string; preview: string; file?: File } | null>(null);
+  const [plugins, setPlugins] = useState<string[]>([]);
+  const { added: addedPlugins } = usePlugins();
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [pasted, setPasted] = useState<PastedBlock[]>([]);
   const [localMode, setLocalMode] = useState<ChatMode>("default");
@@ -119,6 +125,7 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
 
   const hasText = value.trim().length > 0;
   const hasContent = hasText || attachedImage || attachedFiles.length > 0 || pasted.length > 0;
+  const showTray = !!attachedImage || attachedFiles.length > 0 || pasted.length > 0 || plugins.length > 0;
 
   // Pasting 50+ lines turns the text into its own card; shorter pastes stay normal text.
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -146,9 +153,12 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
     const extras = pasted.length ? { typed, pasted } : undefined;
     const full = [typed, ...pasted.map((p) => p.text)].filter(Boolean).join("\n\n");
     setPasted([]);
-    if (attachedFiles.length && onSendFiles) {
-      onSendFiles(full || "Inspect these files and tell me what they contain.", attachedFiles, extras ?? { typed, pasted: [] });
-      setValue(""); finalTranscriptRef.current = ""; setAttachedFiles([]);
+    const chosen = plugins; setPlugins([]);
+    // With a plugin selected, an attached image is a source file for conversion, not a picture to describe.
+    const files = chosen.length && attachedImage?.file ? [...attachedFiles, attachedImage.file] : attachedFiles;
+    if (files.length && onSendFiles) {
+      onSendFiles(full || (chosen.length ? "" : "Inspect these files and tell me what they contain."), files, extras ?? { typed, pasted: [] }, chosen);
+      setValue(""); finalTranscriptRef.current = ""; setAttachedFiles([]); setAttachedImage(null);
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
@@ -156,7 +166,8 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
       full || (attachedImage ? "Analyze this image" : ""),
       attachedImage ? { base64: attachedImage.base64, mimeType: attachedImage.mimeType } : undefined,
       taskMode,
-      extras
+      extras,
+      chosen
     );
     setValue("");
     finalTranscriptRef.current = "";
@@ -166,12 +177,13 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
 
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
-  const mentionMatches = mention ? filterPlugins(mention.query) : [];
+  const mentionMatches = mention ? filterPlugins(addedPlugins, mention.query) : [];
   const updateMention = (text: string, caret: number) => { const m = findMention(text, caret); setMention(m); if (!m || m.query !== mention?.query) setMentionIndex(0); };
-  const pickPlugin = (name: string) => {
+  const pickPlugin = (id: string) => {
     const el = textareaRef.current;
     if (!mention || !el) return;
-    const next = insertMention(value, mention.start, el.selectionStart ?? value.length, name);
+    setPlugins((cur) => (cur.includes(id) ? cur : [...cur, id]));
+    const next = removeMention(value, mention.start, el.selectionStart ?? value.length);
     setValue(next.text); finalTranscriptRef.current = next.text; setMention(null);
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(next.caret, next.caret); autoResize(); });
   };
@@ -180,7 +192,7 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
     if (mention && mentionMatches.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex((i) => (i + 1) % mentionMatches.length); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length); return; }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickPlugin(mentionMatches[Math.min(mentionIndex, mentionMatches.length - 1)].name); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickPlugin(mentionMatches[Math.min(mentionIndex, mentionMatches.length - 1)].id); return; }
       if (e.key === "Escape") { e.preventDefault(); setMention(null); return; }
     }
     // On touch devices (mobile), Enter should insert a newline (default behavior).
@@ -228,7 +240,7 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
       reader.onload = () => {
         const result = reader.result as string;
         const base64 = result.split(",")[1];
-        setAttachedImage({ base64, mimeType: file.type, preview: result });
+        setAttachedImage({ base64, mimeType: file.type, preview: result, file });
       };
       reader.readAsDataURL(file);
       e.target.value = "";
@@ -263,21 +275,21 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
     <div className="w-full px-3 pb-3 pt-2 sm:px-4 sm:pb-4">
       <div className="relative max-w-2xl mx-auto">
         {mention && mentionMatches.length > 0 && (
-          <div role="listbox" aria-label="Plugins" className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-64 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
-            <p className="px-3 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">Plugins</p>
+          <div role="listbox" aria-label="Plugins" className="absolute bottom-full left-0 right-0 z-30 mb-2 max-h-[min(18rem,40dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-lg">
             {mentionMatches.map((p, i) => (
-              <button key={p.name} type="button" role="option" aria-selected={i === mentionIndex}
-                onMouseDown={(e) => { e.preventDefault(); pickPlugin(p.name); }} onMouseEnter={() => setMentionIndex(i)}
-                className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left", i === mentionIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/60")}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary"><p.icon className="size-4" /></span>
-                <span className="min-w-0"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted-foreground">{p.description}</span></span>
-              </button>
+              <div key={p.id} role="option" aria-selected={i === mentionIndex} aria-label={p.name} tabIndex={-1}
+                onMouseDown={(e) => { e.preventDefault(); pickPlugin(p.id); }} onMouseEnter={() => setMentionIndex(i)}
+                className={cn("flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 text-left", i === mentionIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/60")}>
+                <PluginIcon plugin={p} className="size-9" />
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{p.name}</span><span className="block truncate text-xs text-muted-foreground">{p.tagline}</span></span>
+                <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border"><Plus className="size-4" /></span>
+              </div>
             ))}
           </div>
         )}
         <PromptInput onSubmit={() => handleSend()} className="[&_[data-slot=input-group]]:rounded-[24px] [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-none [&_[data-slot=input-group]]:ring-0! [&_[data-slot=input-group]]:focus-within:border-foreground/20">
           {/* Attachments and pasted prompts: same look as in the sent message */}
-          {(attachedImage || attachedFiles.length > 0 || pasted.length > 0) && (
+          {showTray && (
             <div className="flex w-full flex-wrap basis-full justify-start gap-3 self-stretch px-3 pt-4 pr-5">
               {attachedImage && (
                 <ImageTile src={attachedImage.preview} alt="Attached image">
@@ -289,6 +301,13 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
                   <RemoveBtn label={`Remove ${f.name}`} onClick={() => setAttachedFiles((cur) => cur.filter((_, j) => j !== i))} />
                 </FileChip>
               ))}
+              {plugins.map((id) => { const p = PLUGIN_BY_ID.get(id)!; return (
+                <span key={id} className="relative flex h-[44px] items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-4">
+                  <PluginIcon plugin={p} className="size-8 rounded-full" />
+                  <span className="text-sm font-medium text-foreground">{p.name}</span>
+                  <RemoveBtn label={`Remove ${p.name} plugin`} onClick={() => setPlugins((cur) => cur.filter((x) => x !== id))} />
+                </span>
+              ); })}
               {pasted.map((p, i) => (
                 <div key={i} className="relative flex h-[72px] min-w-0 max-w-[260px] items-center gap-3 rounded-2xl border border-border bg-card pl-3 pr-5">
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-secondary"><FileText className="size-5 text-muted-foreground" /></span>
