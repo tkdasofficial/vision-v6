@@ -18,7 +18,7 @@ export default function CodeBlock({ code, language, filename, children, copyText
   const { copied, copy } = useCopy();
   const box = useRef<HTMLDivElement>(null);
   const [font, setFont] = useState(13);
-  const lang = useMemo(() => detectLanguage(code, language), [code, language]);
+  const lang = useMemo(() => regionLabel ? language : detectLanguage(code, language), [code, language, regionLabel]);
   const hl = useMemo(() => highlight(code, lang), [code, lang]);
   const name = filenameFor(lang, filename);
   const canPreview = ["html", "htm", "svg"].includes(lang ?? "");
