@@ -35,7 +35,7 @@ export default function ModeSelector({ selectedMode, onModeChange }: Props) {
             className={cn("h-8 shrink-0 gap-1.5 rounded-full border transition-colors",
               "data-[state=open]:bg-accent data-[state=open]:text-foreground",
               active ? "border-transparent bg-secondary pl-2.5 pr-2 text-foreground hover:bg-accent [&_svg]:size-4" : "w-8 border-border p-0 text-muted-foreground hover:bg-accent hover:text-foreground [&_svg]:size-[18px]")}>
-            <CurrentIcon className="shrink-0" />
+            {CurrentIcon ? <CurrentIcon className="shrink-0" /> : <DiceIcon className="shrink-0" />}
             {active && <><span className="text-[13px] font-medium leading-none">{current.label}</span><ChevronDown className="size-3.5! opacity-60" /></>}
           </Button>
         </DropdownMenuTrigger>
