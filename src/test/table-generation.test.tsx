@@ -44,9 +44,9 @@ describe("Advanced chat tables", () => {
     expect(screen.getByText("0 rows · 2 columns")).toBeInTheDocument();
     rerender(<MarkdownReply>{"| A | B |\n| --- | --- |\n| One | Two |"}</MarkdownReply>);
     expect(screen.getByText("1 rows · 2 columns")).toBeInTheDocument();
-    rerender(<MarkdownReply>{`\x60\x60\x60markdown\n${table}\n\x60\x60\x60`}</MarkdownReply>);
+    rerender(<MarkdownReply>{`\x60\x60\x60text\n${table}\n\x60\x60\x60`}</MarkdownReply>);
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Markdown copy box" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Text copy box" })).toBeInTheDocument();
   });
 
   it("downloads a UTF-8 CSV in the currently displayed order", () => {
