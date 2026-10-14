@@ -43,10 +43,11 @@ describe("content intent", () => {
   it("raw markdown requests keep syntax literal", () => {
     const r = detectContentIntent("Write a README in raw markdown for my CLI tool");
     expect(r.rawMarkdown).toBe(true);
-    expect(intentAddendum(r)).toContain("tagged text");
+    expect(intentAddendum(r)).toContain("literal Markdown source");
   });
   it("addenda forbid duplication and preserve data validity", () => {
-    expect(intentAddendum(detectContentIntent("Write a poem about rain"))).toMatch(/never repeat/);
+    expect(intentAddendum(detectContentIntent("Write a poem about rain"))).toMatch(/ONLY the finished deliverable/);
+    expect(intentAddendum(detectContentIntent("Write three captions for my bakery"))).toMatch(/never repeat/);
     expect(intentAddendum(detectContentIntent("Create a JSON configuration"))).toMatch(/valid/);
     expect(intentAddendum(detectContentIntent("Explain closures"))).toMatch(/without copy boxes/);
   });
