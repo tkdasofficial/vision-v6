@@ -244,6 +244,69 @@ export const TOOLS: Tool[] = [
     const warn = kindOf(f) === "pdf" ? " Layout, images and fonts from the PDF are not kept — only the text." : "";
     return { text: `Converted **${f.name}** to ${to.toUpperCase()}.${warn}${pdfNote(to, md)}`, files: [out] };
   } },
+  { id: "convert_format", category: "File conversion", desc: "Convert ANY attached file between compatible formats using the format registry: data (CSV, TSV, JSON, JSONL, XML, YAML, TOML, SQL inserts, XLSX, ODS), config (INI, CFG, CONF, ENV, PROPERTIES), subtitles (SRT, VTT, ASS, SSA, LRC), contacts/calendars (VCF, ICS), maps (GPX, KML, GeoJSON), notebooks (IPYNB → py/md/html/pdf), code/logs/diffs → txt/md/html/pdf/docx/csv, RTF/ODT/PPTX/ODP/FB2/TeX/EPUB text, archives (ZIP, TAR, GZ, TGZ repack), comic CBZ → PDF, WOFF → TTF/OTF, draw.io → DOT/Mermaid/JSON. Media, office-native, database, e-book, font and diagram rendering conversions run as background tasks automatically", params: '{"to": string (target extension), "file"?: string}', run: async (c, p) => {
+    const { formatOfName, routeConversion, canonicalId, matchesSignature, hasSignature, FORMAT_BY_ID } = await import("@/lib/formats/inventory");
+    const F = await import("@/lib/formats/convert");
+    if (!c.files.length) throw new Error("Attach the file to convert.");
+    const f = (p?.file && c.files.find((x) => x.name === p.file)) || c.files[c.files.length - 1];
+    const fmt = formatOfName(f.name); if (!fmt) throw new Error(`I don't recognise the format of ${f.name}.`);
+    if (hasSignature(fmt.id) && !matchesSignature(fmt.id, f.bytes)) throw new Error(`${f.name} is named .${ext(f.name)} but its content is not a real ${fmt.name} file.`);
+    const to = canonicalId(String(p?.to ?? "")) ?? String(p?.to ?? "").toLowerCase();
+    const r = routeConversion(fmt.id, to);
+    if (r.where === "unsupported") throw new Error(r.reason);
+    if (r.where === "runtime") throw new Error(`${fmt.name} → ${to.toUpperCase()} runs as a background task: send the file again with "convert to ${to}" and it starts automatically.`);
+    const nm = P.slugify(base(f.name)) || "converted";
+    let out: WorkFile;
+    if (fmt.id === "cbz" && to === "pdf") {
+      const pages = Object.entries((F.read("cbz", f.name, f.bytes) as any).files as { path: string; bytes: Uint8Array }[]).map(([, v]) => v).filter((x) => /\.(jpe?g|png)$/i.test(x.path)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+      if (!pages.length) throw new Error("The comic has no JPEG/PNG pages.");
+      const doc = await PDFDocument.create();
+      for (const pg of pages) { const png = P.sniffType(pg.bytes)?.ext === "png"; const im = png ? await doc.embedPng(pg.bytes) : await doc.embedJpg(pg.bytes); doc.addPage([im.width, im.height]).drawImage(im, { x: 0, y: 0, width: im.width, height: im.height }); }
+      out = { name: `${nm}.pdf`, mime: "application/pdf", bytes: await doc.save() };
+    } else if (fmt.id === "ipynb" && to === "py") {
+      out = txt(`${nm}.py`, F.notebookMd(strFromU8(f.bytes)).py, "text/x-python");
+    } else if ((fmt.id === "diff" || fmt.id === "patch") && (to === "diff" || to === "patch")) {
+      F.parseDiff(strFromU8(f.bytes)); out = { name: `${nm}.${to}`, mime: "text/x-diff", bytes: f.bytes };
+    } else if (fmt.category === "code" || fmt.id === "dockerfile" || fmt.id === "gitignore" || ((fmt.id === "mmd" || fmt.id === "puml" || fmt.id === "dot") && to !== "json")) {
+      const src = strFromU8(f.bytes);
+      if (to === "json") { const lines = src.split(/\r?\n/); out = txt(`${nm}.json`, JSON.stringify(fmt.id === "dockerfile" ? lines.filter((l) => /^\s*[A-Z]+\s/.test(l)).map((l) => ({ instruction: l.trim().split(/\s+/)[0], args: l.trim().split(/\s+/).slice(1).join(" ") })) : fmt.id === "gitignore" ? lines.map((l) => l.trim()).filter((l) => l && !l.startsWith("#")).map((pattern) => ({ pattern, negated: pattern.startsWith("!") })) : { lines: lines.length, text: src }, null, 2), "application/json"); }
+      else if (to === "txt") out = txt(`${nm}.txt`, src);
+      else { const md = `# ${f.name}\n\n\`\`\`${fmt.id}\n${src.replace(/\`\`\`/g, "ʼʼʼ")}\n\`\`\``; out = await buildDocument(to, f.name, md); out.name = `${nm}.${ext(out.name)}`; }
+    } else if (["pdf", "docx", "html", "md", "txt", "epub"].includes(fmt.id) && !(fmt.id === "html" && (to === "csv" || to === "xlsx"))) {
+      const md = fmt.id === "md" || fmt.id === "txt" ? strFromU8(f.bytes) : await textOf(f, c);
+      if (to === "rtf") out = txt(`${nm}.rtf`, F.textToRtf(md), "application/rtf"); else { out = await buildDocument(to, base(f.name), md); out.name = `${nm}.${ext(out.name)}`; }
+    } else {
+      const inter = fmt.id === "html" ? { kind: "table" as const, rows: (await import("@/lib/formats/convert")).mdTable("") .length ? [] : (() => { const h = strFromU8(f.bytes); const t = h.match(/<table[\s\S]*?<\/table>/i)?.[0]; if (!t) throw new Error("No table found in the HTML."); return [...t.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => [...m[0].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((x) => x[1].replace(/<[^>]+>/g, "").trim())); })() } : F.read(fmt.id, f.name, f.bytes);
+      const w = F.write(to, inter, nm, fmt.id);
+      if ("doc" in w) { out = await buildDocument(w.doc.format, w.doc.title, w.doc.md); out.name = `${nm}.${ext(out.name)}`; }
+      else out = { name: w.name, mime: w.mime, bytes: w.bytes };
+    }
+    const bad = F.verifyProduced(to, out.bytes); if (bad) throw new Error(bad);
+    const lossy = FORMAT_BY_ID.get(fmt.id)?.notes;
+    return { text: `Converted **${f.name}** (${fmt.name}) to **${out.name}**.${lossy && /dropped|lost|only|not kept|inferred/i.test(lossy) ? ` Note: ${lossy}` : ""}`, files: [out] };
+  } },
+  { id: "format_support", category: "Metadata", desc: "Answer what VISION can do with a file format (read, create, convert targets, where it runs) or inspect an attached file's format details (fonts, SVG, DXF, archives, notebooks, subtitles, calendars, contacts, maps, diffs, logs, .env secrets warning)", params: '{"format"?: string}', run: async (c, p) => {
+    const I = await import("@/lib/formats/inventory"); const F = await import("@/lib/formats/convert");
+    if (p?.format && !c.files.length) { const id = I.canonicalId(String(p.format)); const x = id && I.FORMAT_BY_ID.get(id); if (!x) throw new Error(`"${p.format}" is not in VISION's format registry.`); return { text: I.capabilitySummary(x), data: x }; }
+    const f = c.files[c.files.length - 1]; if (!f) throw new Error("Attach a file or name a format.");
+    const x = I.formatOfName(f.name); if (!x) throw new Error(`I don't recognise the format of ${f.name}.`);
+    const real = !I.hasSignature(x.id) || I.matchesSignature(x.id, f.bytes);
+    const s = () => strFromU8(f.bytes.subarray(0, 4_000_000));
+    let details: unknown = null;
+    try {
+      if (x.category === "font") details = F.fontInfo(f.bytes);
+      else if (x.id === "svg") details = F.svgInfo(s());
+      else if (x.id === "dxf") details = F.dxfInfo(s());
+      else if (x.id === "drawio") { const g = F.parseDrawio(s()); details = { shapes: g.nodes.length, connectors: g.edges.length }; }
+      else if (x.id === "ipynb") details = { cells: F.notebookMd(s()).cells };
+      else if (x.id === "env") { const v = F.parseProps(s()); details = { keys: Object.keys(v).length, secretLooking: Object.keys(v).filter((k) => F.SECRETISH.test(k)) }; }
+      else if (x.id === "diff" || x.id === "patch") details = F.parseDiff(s());
+      else if (x.category === "archive" && x.inline.length) { const r = F.read(x.id, f.name, f.bytes) as any; details = { entries: r.files.length, files: r.files.slice(0, 200).map((e: any) => `${e.path} (${P.fmtBytes(e.bytes.length)})`) }; }
+      else if (x.inline.length && x.read && !["pdf", "docx", "xlsx", "html", "md", "txt", "epub"].includes(x.id) && x.category !== "code") { const r: any = F.read(x.id, f.name, f.bytes); details = r.kind === "table" ? { rows: r.rows.length - 1, columns: r.rows[0]?.length } : r.kind === "cues" ? { cues: r.cues.length, duration_s: Math.round(r.cues[r.cues.length - 1].end / 1000) } : r.kind === "geo" ? { features: r.features.length } : r.kind === "tree" ? { records: Array.isArray(r.value) ? r.value.length : Object.keys(r.value ?? {}).length } : { characters: r.md?.length }; }
+    } catch (e: any) { details = { problem: e?.message ?? "unreadable" }; }
+    const info = { file: f.name, format: x.name, size: P.fmtBytes(f.bytes.length), contentMatchesExtension: real, ...(details ? { details } : {}), capabilities: I.capabilitySummary(x) };
+    return { data: info, text: Object.entries(info).map(([k, v]) => `- **${k}**: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n") };
+  } },
   { id: "pdf_merge", category: "PDF processing", desc: "Merge all attached PDFs (in order) into one", params: "{}", run: async (c) => {
     const pdfs = many(c, ["pdf"]); if (pdfs.length < 2) throw new Error("Attach at least two PDFs to merge.");
     const out = await PDFDocument.create();
@@ -493,6 +556,8 @@ export async function verifyOutput(f: WorkFile): Promise<string | null> {
   try {
     if (!f.bytes.length) return "file is empty";
     const e = ext(f.name);
+    const { verifyProduced } = await import("@/lib/formats/convert");
+    const bad = verifyProduced(e, f.bytes); if (bad) return bad;
     if (e === "pdf") await PDFDocument.load(f.bytes);
     else if (e === "json") JSON.parse(strFromU8(f.bytes));
     else if (/^(zip|docx|xlsx|epub)$/.test(e)) { const { unzipSync } = await import("fflate"); const z = unzipSync(f.bytes); if (e === "docx" && !z["word/document.xml"]) return "Word file is missing its body"; if (e === "xlsx") readXlsx(f.bytes, 1); }
