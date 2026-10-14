@@ -69,6 +69,13 @@ export const Route = createFileRoute("/api/chat")({
           const pm = await loadProjectMemory(caller.user.id, chatCtx.projectId, chatId);
           if (pm) system += `\n\n${pm}`;
         }
+        let contentIntent: import("@/lib/ai/content-intent").IntentResult | null = null;
+        // Content intent (copy-ready deliverable / code / data / normal answer) shapes the output format only.
+        {
+          const { detectContentIntent, intentAddendum } = await import("@/lib/ai/content-intent");
+          contentIntent = lastHasMedia ? null : detectContentIntent(lastText, previousText);
+          if (contentIntent) system += intentAddendum(contentIntent);
+        }
         let searchUsed = "none";
         // "auto" also searches when any mode is explicitly asked for sources, so citations come from a real search, not memory.
         const { asksForSources } = await import("@/lib/ai/request-route");
@@ -170,7 +177,9 @@ export const Route = createFileRoute("/api/chat")({
         for (const t of candidatesFor(task)) {
           const r = await streamFromProvider(t, fullMessages, { maxTokens: deep ? 8192 : 4096, deep }, request.signal);
           if (r.ok) {
-            return new Response(r.body, {
+            const { wrapCopyReady } = await import("@/lib/ai/copy-ready-stream");
+            const body = contentIntent?.intent === "deliverable" && contentIntent.single ? wrapCopyReady(r.body, contentIntent.rawMarkdown ? "text" : "markdown") : r.body;
+            return new Response(body, {
               headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-store",

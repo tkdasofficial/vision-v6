@@ -13,10 +13,11 @@ describe("Markdown writing copy boxes", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<MarkdownReply>{"Here is your prompt.\n\n```markdown\nWrite a **clear** story.\n```\n\nUse it as written."}</MarkdownReply>);
     const box = screen.getByRole("region", { name: "Markdown copy box" });
-    expect(within(box).getByText("Write a **clear** story.")).toBeInTheDocument();
+    expect(box).toHaveTextContent("Write a clear story.");
+    expect(box).not.toHaveTextContent("**");
     expect(box).not.toHaveTextContent("Here is your prompt.");
     fireEvent.click(within(box).getByRole("button", { name: "Copy Markdown" }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Write a **clear** story."));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Write a clear story."));
     expect(within(box).getByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 
@@ -47,7 +48,8 @@ describe("Markdown writing copy boxes", () => {
     render(<MarkdownReply>{"Use `short text` inline.\n\n````markdown\n# Template\n```js\nconst a = 1;\n```\n````\n\n```python\nprint('hello')\n```"}</MarkdownReply>);
     expect(screen.getAllByRole("region")).toHaveLength(1);
     expect(screen.getByRole("region")).toHaveTextContent("const a = 1;");
-    expect(screen.getByTestId("code-viewer")).toHaveTextContent("print('hello')");
+    const viewers = screen.getAllByTestId("code-viewer");
+    expect(viewers[viewers.length - 1]).toHaveTextContent("print('hello')");
     expect(screen.getByText("short text").tagName).toBe("CODE");
   });
 

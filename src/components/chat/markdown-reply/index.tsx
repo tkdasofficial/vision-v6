@@ -1,11 +1,15 @@
-import { Children, isValidElement, type ReactNode } from "react";
+import { Children, isValidElement, useMemo, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CodeBlock from "@/components/chat/code-block";
 import TextCopyBox from "@/components/chat/text-copy-box";
+import CopyReadyBox from "@/components/chat/copy-ready-box";
 import TableReply from "@/components/chat/table-reply";
+import { dedupeDeliverables } from "@/lib/markdown-plain";
 
-const proseLanguages = new Set(["", "text", "txt", "plain", "plaintext", "markdown", "md", "prompt"]);
+// "markdown" fences are copy-ready deliverables (rendered); text/prompt/untagged fences stay literal.
+const rawLanguages = new Set(["", "text", "txt", "plain", "plaintext", "prompt"]);
+const renderedLanguages = new Set(["markdown", "md"]);
 
 const components: Components = {
   pre: ({ children, node }) => {
@@ -13,9 +17,8 @@ const components: Components = {
     if (!isValidElement<{ children?: ReactNode; className?: string }>(child)) return <pre>{children}</pre>;
     const language = child.props.className?.replace(/^language-/, "").toLowerCase() || "";
     const text = String(child.props.children ?? "").replace(/\n$/, "");
-    if (proseLanguages.has(language)) {
-      return <TextCopyBox text={text} label={language === "prompt" ? "Prompt" : language === "markdown" || language === "md" ? "Markdown" : "Text"} />;
-    }
+    if (renderedLanguages.has(language)) return <CopyReadyBox markdown={text} renderCode={(code, lang) => rawLanguages.has(lang) ? <TextCopyBox text={code} label="Text" /> : <CodeBlock code={code} language={lang} />} />;
+    if (rawLanguages.has(language)) return <TextCopyBox text={text} label={language === "prompt" ? "Prompt" : "Text"} />;
     const codeNode = node?.children.find((item) => item.type === "element" && item.tagName === "code");
     const data = codeNode?.data;
     const meta = data && "meta" in data ? String(data.meta ?? "") : "";
@@ -25,5 +28,6 @@ const components: Components = {
 };
 
 export default function MarkdownReply({ children }: { children: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={children.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? children.length)}>{tableChildren}</TableReply> }}>{children}</ReactMarkdown>;
+  const source = useMemo(() => dedupeDeliverables(children), [children]);
+  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ ...components, table: ({ children: tableChildren, node }) => <TableReply node={node} markdown={source.slice(node?.position?.start.offset ?? 0, node?.position?.end.offset ?? source.length)}>{tableChildren}</TableReply> }}>{source}</ReactMarkdown>;
 }

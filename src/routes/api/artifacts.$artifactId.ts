@@ -1,27 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Owner-only, expiring download of a job artifact (stored privately in Drive).
+// Owner-only, expiring download of a job artifact (stored privately in Drive or D1).
+// The browser fetches this with credentials (see src/lib/download.ts) so the session cookie is always sent.
 export const Route = createFileRoute("/api/artifacts/$artifactId")({
   server: {
     handlers: {
       GET: async ({ params }) => {
+        const { artifactResponse } = await import("@/lib/jobs/artifact-download");
         const { getCaller } = await import("@/lib/cloud/auth.server");
         const caller = await getCaller();
-        if (!caller) return Response.json({ error: "Please sign in." }, { status: 401 });
-        const { getArtifact } = await import("@/lib/jobs/jobs.server");
-        const a = await getArtifact(caller.user.id, params.artifactId);
-        if (!a || a.kind === "source") return Response.json({ error: "This download has expired or does not exist." }, { status: 404 });
+        const { d1 } = await import("@/lib/cloud/d1.server");
         const { getArtifactBytes } = await import("@/lib/jobs/artifact-store.server");
-        const bytes = await getArtifactBytes(a.drive_file_id);
-        const safe = a.name.replace(/[^\w.\-]+/g, "_");
-        return new Response(bytes as Uint8Array<ArrayBuffer>, {
-          headers: {
-            "Content-Type": a.mime,
-            "Content-Disposition": `attachment; filename="${safe}"`,
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff",
-            "X-Checksum-SHA256": a.sha256,
-          },
+        return artifactResponse({
+          userId: caller?.user.id ?? null,
+          id: params.artifactId,
+          find: async (id) => (await d1<any>("SELECT * FROM job_artifacts WHERE id = ?", [id]))[0] ?? null,
+          read: getArtifactBytes,
+          log: (m) => console.error(m),
         });
       },
     },
