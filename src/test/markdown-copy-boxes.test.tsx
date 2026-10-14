@@ -13,10 +13,11 @@ describe("Markdown writing copy boxes", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<MarkdownReply>{"Here is your prompt.\n\n```markdown\nWrite a **clear** story.\n```\n\nUse it as written."}</MarkdownReply>);
     const box = screen.getByRole("region", { name: "Markdown copy box" });
-    expect(within(box).getByText("Write a **clear** story.")).toBeInTheDocument();
+    expect(box).toHaveTextContent("Write a clear story.");
+    expect(box).not.toHaveTextContent("**");
     expect(box).not.toHaveTextContent("Here is your prompt.");
     fireEvent.click(within(box).getByRole("button", { name: "Copy Markdown" }));
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Write a **clear** story."));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Write a clear story."));
     expect(within(box).getByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
 

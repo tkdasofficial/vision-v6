@@ -19,7 +19,7 @@ export default function CopyReadyBox({ markdown, label = "Markdown", renderCode 
           {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
         </Button>
       </div>
-      <div ref={body} className="prose prose-sm max-w-none break-words p-4 text-sm leading-relaxed text-foreground dark:prose-invert [overflow-wrap:anywhere]">
+      <div ref={body} className="max-w-none break-words p-4 text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={renderCode ? { pre: ({ children }) => { const c: any = Array.isArray(children) ? children[0] : children; const lang = String(c?.props?.className ?? "").replace(/^language-/, ""); return <>{renderCode(String(c?.props?.children ?? "").replace(/\n$/, ""), lang)}</>; } } : undefined}>{markdown}</ReactMarkdown>
       </div>
     </section>
