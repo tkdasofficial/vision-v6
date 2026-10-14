@@ -4,7 +4,6 @@ import MarkdownReply from "@/components/chat/markdown-reply";
 import { systemPromptFor } from "@/lib/ai/prompts.server";
 import { classifyTask } from "@/lib/ai/task-router";
 
-vi.mock("@/components/chat/code-block", () => ({ default: ({ code }: { code: string }) => <div data-testid="code-viewer">{code}</div> }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("Markdown writing copy boxes", () => {
@@ -48,7 +47,7 @@ describe("Markdown writing copy boxes", () => {
     render(<MarkdownReply>{"Use `short text` inline.\n\n````markdown\n# Template\n```js\nconst a = 1;\n```\n````\n\n```python\nprint('hello')\n```"}</MarkdownReply>);
     expect(screen.getAllByRole("region")).toHaveLength(1);
     expect(screen.getByRole("region")).toHaveTextContent("const a = 1;");
-    const viewers = screen.getAllByTestId("code-viewer");
+    const viewers = screen.getAllByRole("button", { name: "Open code full screen" });
     expect(viewers[viewers.length - 1]).toHaveTextContent("print('hello')");
     expect(screen.getByText("short text").tagName).toBe("CODE");
   });

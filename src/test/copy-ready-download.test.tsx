@@ -7,7 +7,6 @@ import { markdownToPlainText, dedupeDeliverables } from "@/lib/markdown-plain";
 import { artifactResponse, type ArtifactRecord } from "@/lib/jobs/artifact-download";
 import { fetchDownload } from "@/lib/download";
 
-vi.mock("@/components/chat/code-block", () => ({ default: ({ code, language }: { code: string; language: string }) => <div data-testid="code-viewer" data-lang={language}>{code}</div> }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("content intent", () => {
@@ -91,8 +90,8 @@ describe("copy-ready rendering", () => {
   });
   it("keeps code and JSON in the code viewer and CSV structure intact", () => {
     render(<MarkdownReply>{"```json\n{\"a\": 1}\n```\n\n```csv\nname,qty\nA,-3\n```\n\n```python\ndef f():\n    return 1\n```"}</MarkdownReply>);
-    const viewers = screen.getAllByTestId("code-viewer");
-    expect(JSON.parse(viewers[0].textContent!)).toEqual({ a: 1 });
+    const viewers = screen.getAllByRole("button", { name: "Open code full screen" });
+    expect(JSON.parse(viewers[0].textContent ?? "")).toEqual({ a: 1 });
     expect(viewers[1].textContent).toBe("name,qty\nA,-3");
     expect(viewers[2].textContent).toBe("def f():\n    return 1");
   });
