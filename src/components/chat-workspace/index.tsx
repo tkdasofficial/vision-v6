@@ -420,7 +420,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
         setMessages((prev) => prev.some((m) => m.id === replyId)
           ? prev.map((m) => (m.id === replyId ? { ...m, content: visible } : m))
           : [...prev, { id: replyId, role: "assistant", content: visible, timestamp: new Date(), toolId: tool?.id }]);
-      }, tool?.id, { mode: taskMode, onMeta: (m) => { meta = m; }, signal: ctrl.signal, requestId: replyId, conversationId: chatId ?? undefined,
+      }, tool?.id, { mode: taskMode, webSearch: forceSearch, onMeta: (m) => { meta = m; }, signal: ctrl.signal, requestId: replyId, conversationId: chatId ?? undefined,
         onStatus: (st, detail) => { const ds = STATUS_MAP[st]; if (!deep || !ds) return; deepReal = true; lastDeep = { stage: ds, detail }; setMessages((prev) => prev.some((m) => m.id === replyId) ? prev.map((m) => (m.id === replyId ? { ...m, deep: { stage: ds, detail } } : m)) : prev); } }).finally(() => { stopDeepTimers(); if (abortRef.current === ctrl) abortRef.current = null; setStreaming(false); });
       const stopped = ctrl.signal.aborted;
       const replyText = finalText || (stopped ? "Stopped." : "I couldn't come up with an answer. Please try again.");
@@ -448,16 +448,19 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       clearTimeout(phaseTimer);
       setIsTyping(false);
     }
-  }, [tool, chatId, addChat, messages, updateChatMessages, isIncognito, mode, draftProjectId]);
+  }, [tool, chatId, addChat, messages, updateChatMessages, isIncognito, mode, draftProjectId, runInlineJob]);
 
   /** Attached documents/data/audio plus an instruction → one backend agent task in this chat. */
-  const handleSendFiles = useCallback(async (content: string, files: File[], extras?: { typed: string; pasted: PastedBlock[] }) => {
+  const handleSendFiles = useCallback(async (typedContent: string, files: File[], extras?: { typed: string; pasted: PastedBlock[] }, plugins?: string[]) => {
+    const plan = plugins?.length ? planPluginSend(plugins, typedContent, files) : null;
+    const content = plan ? tagged(plugins, typedContent) : typedContent;
     const kindOf = (f: File): MessageAttachment["kind"] => f.type.startsWith("image/") ? "image" : f.type.startsWith("video/") ? "video" : f.type.startsWith("audio/") ? "audio" : "file";
     setMessages((prev) => [...prev, {
       id: Date.now().toString(), role: "user", content, timestamp: new Date(),
       attachments: files.map((f) => ({ name: f.name, kind: kindOf(f), mime: f.type || undefined, size: f.size })),
       ...(extras?.pasted.length ? { pasted: extras.pasted, typed: extras.typed } : {}),
     }]);
+    if (plan?.kind === "reply") { setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: plan.text, timestamp: new Date() }]); return; }
     let sid: string | null = isIncognito ? null : chatId;
     if (!isIncognito && !chatId) {
       const title = content.slice(0, 60) || files[0].name;
@@ -465,7 +468,7 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
       adoptDraftMode(browserStore(), sid, mode);
       setChatId(sid); setChatTitle(title); onChatCreated?.(sid);
     }
-    await runInlineJob("agent_task", { prompt: content }, sid, files);
+    await runInlineJob("agent_task", { prompt: plan && plan.kind !== "chat" ? plan.prompt : content || "Inspect these files and tell me what they contain." }, sid, files);
   }, [chatId, addChat, tool, isIncognito, runInlineJob, mode, draftProjectId]);
 
   const handleZipUpload = useCallback(async (file: File) => {
