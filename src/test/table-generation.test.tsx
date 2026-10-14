@@ -5,7 +5,6 @@ import { compareTableValues, tableToCsv } from "@/lib/table-export";
 import { systemPromptFor } from "@/lib/ai/prompts.server";
 import { classifyTask } from "@/lib/ai/task-router";
 
-vi.mock("@/components/chat/code-block", () => ({ default: () => <div data-testid="code-viewer" /> }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const table = "| Product | Price |\n| :--- | ---: |\n| **Beta** | 20 |\n| Alpha | 3 |";
 
