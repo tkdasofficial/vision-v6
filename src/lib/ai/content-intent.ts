@@ -36,8 +36,7 @@ export function detectContentIntent(text: string, previousText?: string): Intent
   // Short edit follow-ups ("make it shorter", "add a CTA") inherit the earlier deliverable.
   const followUp = !!previousText && own.length < 160 && /^\s*(make it|now|also|shorter|longer|more|less|change|add|remove|rewrite|again|another|redo|translate it|in (?:hindi|english|bengali|spanish|french))\b/i.test(own);
   if (followUp) {
-    const prev = detectContentIntent(previousText!);
-    if (prev.intent !== "general") return { ...prev, rawMarkdown };
+    return { ...detectContentIntent(previousText!), rawMarkdown };
   }
   const asking = ABOUT.test(own) && !CREATE.test(own.split(/[.?!]/)[0]);
   const create = CREATE.test(own) || /^\s*(an?|the|\d+|two|three|five|ten)?\s*\w*\s*(prompt|caption|email|story|poem|message|letter|bio|essay|tagline|slogan)s?\b/i.test(own);
@@ -47,7 +46,7 @@ export function detectContentIntent(text: string, previousText?: string): Intent
   if (dataFormat && (create || transform || /\b(as|in|into|to)\s+(valid\s+)?(json|jsonl|xml|yaml|yml|toml|csv|tsv)\b/i.test(own)) && !asking) {
     return { intent: "data", dataFormat: dataFormat === "yml" ? "yaml" : dataFormat, rawMarkdown };
   }
-  const category = CATEGORIES.find(([, re]) => re.test(own))?.[0];
+  const category = CATEGORIES.find(([, re]) => new RegExp(re.source.replace(/\)\\b$/, ")s?\\b"), "i").test(own))?.[0];
   if (CODE.test(own) && (create || transform) && !asking && category !== "prompt" && !/\b(story|email|caption|letter)\b/i.test(own)) {
     return { intent: "code", rawMarkdown };
   }

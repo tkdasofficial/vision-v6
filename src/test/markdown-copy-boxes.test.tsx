@@ -48,7 +48,8 @@ describe("Markdown writing copy boxes", () => {
     render(<MarkdownReply>{"Use `short text` inline.\n\n````markdown\n# Template\n```js\nconst a = 1;\n```\n````\n\n```python\nprint('hello')\n```"}</MarkdownReply>);
     expect(screen.getAllByRole("region")).toHaveLength(1);
     expect(screen.getByRole("region")).toHaveTextContent("const a = 1;");
-    expect(screen.getByTestId("code-viewer")).toHaveTextContent("print('hello')");
+    const viewers = screen.getAllByTestId("code-viewer");
+    expect(viewers[viewers.length - 1]).toHaveTextContent("print('hello')");
     expect(screen.getByText("short text").tagName).toBe("CODE");
   });
 
