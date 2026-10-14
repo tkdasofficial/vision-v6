@@ -1,0 +1,30 @@
+name = "vision"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[vars]
+# Exact origins the gateway may send users back to (comma-separated).
+ALLOWED_RETURN_ORIGINS = "https://id-preview--320900a1-fc2b-4cad-ad02-9f2fe4ba7bc2.lovable.app,https://project--320900a1-fc2b-4cad-ad02-9f2fe4ba7bc2-dev.lovable.app,https://project--320900a1-fc2b-4cad-ad02-9f2fe4ba7bc2.lovable.app,https://320900a1-fc2b-4cad-ad02-9f2fe4ba7bc2.lovableproject.com,http://localhost:8080"
+
+# Secrets (set with `wrangler secret put`, never committed):
+# GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET,
+# STATE_KEY, SIGNING_KEY
+
+# Gmail SMTP credentials from the account Secrets Store (used by POST /mail).
+[[secrets_store_secrets]]
+binding = "SMTP_EMAIL"
+store_id = "b4394e5cddb24a46b6984c69ce02b8b6"
+secret_name = "SMTP_EMAIL"
+
+[[secrets_store_secrets]]
+binding = "SMTP_PASSWORD"
+store_id = "b4394e5cddb24a46b6984c69ce02b8b6"
+secret_name = "SMTP_PASSWORD"
+# MAIL_TOKEN: Worker secret shared with the app (app env MAIL_TOKEN).
+
+# VISION database: used only by the /runtime relay for GitHub Actions jobs.
+[[d1_databases]]
+binding = "DB"
+database_name = "vision"
+database_id = "ded73090-4d47-45ac-952f-24ae2beaba5f"
