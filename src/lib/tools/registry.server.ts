@@ -156,6 +156,18 @@ async function sha(algo: string, bytes: Uint8Array) {
 }
 
 // ---------- Catalogue ----------
+/** Shared tail of the three repository analyzers: each provider fetches on its own; the model only sees what was retrieved. */
+async function repoTool(c: ToolCtx, p: any, fetchRepo: () => Promise<import("@/lib/repos/common").RepoSnapshot>) {
+  const { snapshotText, inspectedList } = await import("@/lib/repos/common");
+  await c.note("Fetching the public repository");
+  const s = await fetchRepo();
+  await c.note(`Read ${s.fullName}: ${s.tree.length} files listed, ${s.files.length + (s.readme ? 1 : 0)} opened`);
+  const q = String(p?.question ?? "").trim() || "Summarize the architecture, main technologies and dependencies, important implementation details and any potential issues.";
+  const answer = await c.complete("You analyze a source repository using ONLY the retrieved material. Cite file paths. Never claim to have read a file that is not included; say what is unknown. Separate observations from inferences.", `${snapshotText(s)}\n\nQuestion: ${q}`, 3000);
+  const text = `## ${s.fullName}\n${s.url}\n\n${answer.trim()}\n\n_Inspected: ${inspectedList(s)}${s.treeTruncated ? " · file tree truncated" : ""}${s.missing.length ? ` · could not read: ${s.missing.join(", ")}` : ""}._`;
+  return { text, data: { repo: s.fullName, url: s.url, branch: s.defaultBranch, files: s.tree.length, inspected: [...(s.readme ? ["README"] : []), ...s.files.map((f) => f.path)] } };
+}
+
 export const TOOLS: Tool[] = [
   // Files & metadata
   { id: "file_info", category: "Metadata", desc: "Inspect attached files: real type, size, SHA-256, image size, PDF pages/metadata, Word properties, sheet sizes", params: "{}", run: async (c) => {
@@ -491,6 +503,9 @@ export const TOOLS: Tool[] = [
     const files = p?.save_as ? [await buildDocument(p.save_as, h.title ?? "page", md)] : [txt("page.md", md, "text/markdown")];
     return { text: md.slice(0, 3000), data: { title: h.title, description: h.description, headings: h.headings.slice(0, 30), links: h.links.slice(0, 50) }, files };
   } },
+  { id: "github_repo", category: "Repository analysis", desc: "Analyze a PUBLIC GitHub repository (link or owner/name): metadata, README, file tree, dependency manifests and entry points, then answer the question from the retrieved files only", params: '{"repo": string, "question"?: string}', run: async (c, p) => repoTool(c, p, async () => (await import("@/lib/repos/github.server")).fetchGithubRepo(String(p?.repo ?? ""))) },
+  { id: "gitlab_repo", category: "Repository analysis", desc: "Analyze a PUBLIC GitLab (gitlab.com) repository (link or owner/name): metadata, README, file tree, dependency manifests and entry points, then answer the question from the retrieved files only", params: '{"repo": string, "question"?: string}', run: async (c, p) => repoTool(c, p, async () => (await import("@/lib/repos/gitlab.server")).fetchGitlabRepo(String(p?.repo ?? ""))) },
+  { id: "bitbucket_repo", category: "Repository analysis", desc: "Analyze a PUBLIC Bitbucket repository (link or owner/name): metadata, README, file tree, dependency manifests and entry points, then answer the question from the retrieved files only", params: '{"repo": string, "question"?: string}', run: async (c, p) => repoTool(c, p, async () => (await import("@/lib/repos/bitbucket.server")).fetchBitbucketRepo(String(p?.repo ?? ""))) },
   { id: "web_search", category: "Search & retrieval", desc: "Search the web and return sources", params: '{"query": string}', run: async (_c, p) => {
     const { webSearch } = await import("@/lib/search/search.server"); const r = await webSearch(String(p?.query ?? ""));
     if (r.status === "failed") throw new Error("Web search is unavailable right now — no sources could be reached.");
