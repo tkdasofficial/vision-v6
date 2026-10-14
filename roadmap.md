@@ -1,5 +1,5 @@
 # Roadmap
-- [ ] Make shared content blocks fit short content and cap long content at a square; refine styling without adding mobile controls, and verify sizing and copying.
+- [x] Make shared content blocks fit short content and cap long content at a square; refine surfaces, borders and clipped-content fade without adding mobile controls. 74 regression tests pass; signed-in mobile/desktop light/dark checks confirm one-word/three-line/square sizing and full-content copying and expansion.
 - [x] Unify Markdown, text and code copy-block UI with top-left format labels; signed-in desktop/mobile chat verifies all three, clean Markdown copying, literal text copying and expanded viewing.
 - [ ] Add App Guide to Help and expand accurate feature/gesture instructions using the shared floating interface; verify guide interactions.
 - [x] Replace Projects Search button with plus and scope pull-down search to Projects; 23 tests pass for routed/overlay gestures, scrolling and filtering. Signed-in browser verification is blocked by the preview session check.
