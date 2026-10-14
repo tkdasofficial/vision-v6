@@ -37,7 +37,7 @@ describe("Shared copy block behavior", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(<MarkdownReply>{"```markdown\nHello **Sam**.\n```"}</MarkdownReply>);
     fireEvent.click(screen.getByRole("button", { name: "Open code full screen" }));
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Copy", exact: true }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Copy$/ }));
     await waitFor(() => expect(writeText).toHaveBeenLastCalledWith("Hello Sam."));
   });
 
