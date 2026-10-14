@@ -69,6 +69,11 @@ export const Route = createFileRoute("/api/chat")({
           const pm = await loadProjectMemory(caller.user.id, chatCtx.projectId, chatId);
           if (pm) system += `\n\n${pm}`;
         }
+        // Content intent (copy-ready deliverable / code / data / normal answer) shapes the output format only.
+        {
+          const { detectContentIntent, intentAddendum } = await import("@/lib/ai/content-intent");
+          if (!lastHasMedia) system += intentAddendum(detectContentIntent(lastText, previousText));
+        }
         let searchUsed = "none";
         // "auto" also searches when any mode is explicitly asked for sources, so citations come from a real search, not memory.
         const { asksForSources } = await import("@/lib/ai/request-route");
