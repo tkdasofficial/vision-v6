@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/chat")({
         if (wantSearch && lastText.trim()) {
           const { webSearch, sourcesBlock } = await import("@/lib/search/search.server");
           try {
-            const s = await webSearch(pluginSearch ? lastText.replace(/^(?:@[\w .-]+?(?=\s@|\s|$)\s*)+/, "").replace(/^Search\s/, "") : lastText, { signal: request.signal });
+            const s = await webSearch(pluginSearch ? lastText.replace(/^@Web Search\s*/i, "") : lastText, { signal: request.signal });
             searchUsed = `${s.status}:${s.used.join(",") || "none"}`;
             system += `\n\n${sourcesBlock(s.results, s.status, s.failed)}`;
           } catch (e) { console.error("[search]", e); system += "\n\nLive web search was unavailable; say so in the answer."; }

@@ -59,7 +59,21 @@ const searxng: Provider = {
   },
 };
 
-const PROVIDERS = [searxng, wikipedia, duckduckgo];
+// Reddit public search JSON: discussion threads; may be rate-limited or blocked, which counts as a failed source.
+export const reddit: Provider = {
+  id: "reddit", available: () => true,
+  async search(q, f) {
+    const j = await f(`https://www.reddit.com/search.json?limit=5&sort=relevance&raw_json=1&q=${encodeURIComponent(q)}`, AbortSignal.timeout(SEARCH_LIMITS.perAttemptMs));
+    const kids = j?.data?.children;
+    if (!Array.isArray(kids)) throw new SearchError(502, "Malformed response");
+    return kids.filter((k: any) => k?.data?.permalink && !k.data.over_18).slice(0, 5).map((k: any) => ({
+      title: String(k.data.title), url: `https://www.reddit.com${k.data.permalink}`, source: `Reddit (r/${k.data.subreddit})`,
+      snippet: strip(String(k.data.selftext ?? "")).slice(0, 300) || `${k.data.num_comments ?? 0} comments`,
+    }));
+  },
+};
+
+const PROVIDERS = [searxng, wikipedia, duckduckgo, reddit];
 
 function kindOf(e: unknown): FailureKind {
   if (e instanceof SearchError) return classifyFailure(e.status, e.message);
