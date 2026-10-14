@@ -15,3 +15,14 @@ describe("news search", () => {
     expect(asksForSources("write a poem")).toBe(false);
   });
 });
+
+import { untilAnswer } from "@/lib/ai/answer-guard";
+const sse = (s: string) => new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode(s)); c.close(); } });
+describe("answer guard", () => {
+  it("rejects a reasoning-only stream", async () => {
+    expect(await untilAnswer(sse('data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}\n\ndata: [DONE]\n\n'))).toBeNull();
+  });
+  it("passes a stream with answer text", async () => {
+    expect(await untilAnswer(sse('data: {"choices":[{"delta":{"content":"Hi"}}]}\n\n'))).not.toBeNull();
+  });
+});

@@ -179,8 +179,12 @@ export const Route = createFileRoute("/api/chat")({
         for (const t of candidatesFor(task)) {
           const r = await streamFromProvider(t, fullMessages, { maxTokens: deep ? 8192 : 4096, deep }, request.signal);
           if (r.ok) {
+            // Some reasoning models end after thinking with no answer text; fall through to the next model then.
+            const { untilAnswer } = await import("@/lib/ai/answer-guard");
+            const guarded = await untilAnswer(r.body);
+            if (!guarded) { console.error("[chat]", t.provider, t.model, "empty answer"); lastStatus = 502; continue; }
             const { wrapCopyReady } = await import("@/lib/ai/copy-ready-stream");
-            const body = contentIntent?.intent === "deliverable" && contentIntent.single ? wrapCopyReady(r.body, contentIntent.rawMarkdown ? "text" : "markdown") : r.body;
+            const body = contentIntent?.intent === "deliverable" && contentIntent.single ? wrapCopyReady(guarded, contentIntent.rawMarkdown ? "text" : "markdown") : guarded;
             return new Response(body, {
               headers: {
                 "Content-Type": "text/event-stream",
