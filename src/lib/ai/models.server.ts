@@ -13,13 +13,14 @@ export const MODELS = {
   cf120b: { provider: "cf", model: "@cf/openai/gpt-oss-120b", label: "GPT-OSS 120B (Cloudflare)" },
   cfQwen3: { provider: "cf", model: "@cf/qwen/qwen3-30b-a3b-fp8", label: "Qwen3 30B A3B (Cloudflare)" },
   cfQwq: { provider: "cf", model: "@cf/qwen/qwq-32b", label: "QwQ 32B (Cloudflare)" },
+  cfVision: { provider: "cf", model: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout (Cloudflare)" },
   cfCoder: { provider: "cf", model: "@cf/qwen/qwen2.5-coder-32b-instruct", label: "Qwen2.5-Coder 32B (Cloudflare)" },
 } satisfies Record<string, ModelRef>;
 
 // Ordered candidates: first is preferred, the rest are tried only if it fails. At most 3 per request.
 export function candidatesFor(c: TaskClassification): ModelRef[] {
   const m = MODELS;
-  if (c.requiresMultimodalProcessing) return [m.nemotronOmni];
+  if (c.requiresMultimodalProcessing) return [m.nemotronOmni, m.cfVision];
   switch (c.executionMode) {
     case "deep": return [m.groq120b, m.nemotronSuper, m.cf120b];
     case "research": return [m.groq120b, m.nemotronSuper, m.cfQwen3];
