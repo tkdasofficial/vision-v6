@@ -70,6 +70,7 @@ export function settleDrawer(progress: number, velocity: number): boolean {
 }
 export function springStep(position: number, velocity: number, target: number, seconds: number) {
   const dt = Math.min(seconds, 0.032);
-  const nextVelocity = velocity + ((target - position) * 320 - velocity * 34) * dt;
+  // Over-damped (damping > 2√320 ≈ 35.8): glides to rest like the Projects page, never bounces.
+  const nextVelocity = velocity + ((target - position) * 320 - velocity * 40) * dt;
   return { position: Math.min(1, Math.max(0, position + nextVelocity * dt)), velocity: nextVelocity };
 }
