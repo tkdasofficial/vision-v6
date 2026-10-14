@@ -7,6 +7,19 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { JOB_STATUSES, isTerminal, type JobView } from "@/lib/builder/statuses";
 import { cancelJob, downloadUrl, fetchJob } from "@/lib/builder/jobs-client";
+import { downloadFile } from "@/lib/download";
+import { toast } from "sonner";
+
+/** Downloads through an authenticated fetch so the session always reaches the server. */
+function ArtifactButton({ id, name, size }: { id: string; name: string; size?: string }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button type="button" size="sm" variant="secondary" className="rounded-full" disabled={busy} aria-label={`Download ${name}`}
+      onClick={async () => { setBusy(true); try { await downloadFile(downloadUrl(id), name); } catch (e: any) { toast.error(e?.message || "The file couldn't be downloaded."); } finally { setBusy(false); } }}>
+      {busy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Download className="mr-1.5 h-3.5 w-3.5" />}{name}{size && <span className="ml-1 text-muted-foreground">{size}</span>}
+    </Button>
+  );
+}
 import CodeBlock from "@/components/chat/code-block";
 import { looksLikeCode } from "@/components/chat/highlight";
 
@@ -62,7 +75,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
     return (
       <div className="space-y-3">
         {r.steps?.map((s: any, i: number) => s.preview?.kind === "svg" && <img key={i} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(s.preview.content)}`} alt="" className="max-h-96 w-full rounded-xl border border-border bg-background object-contain" />)}
-        {job.artifacts.length > 0 && <div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <Button key={a.id} asChild size="sm" variant="secondary" className="rounded-full"><a href={downloadUrl(a.id)} download={a.name}><Download className="mr-1.5 h-3.5 w-3.5" />{a.name}</a></Button>)}</div>}
+        {job.artifacts.length > 0 && <div className="flex flex-wrap gap-2">{job.artifacts.map((a) => <ArtifactButton key={a.id} id={a.id} name={a.name} />)}</div>}
         <CleanText text={last ? (last.preview?.kind === "markdown" ? last.preview.content : last.text ?? "") : r.answer} />
       </div>
     );
@@ -93,9 +106,7 @@ export default function JobCard({ job: given, onRetry, compact }: { job: JobView
       {job.artifacts.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {job.artifacts.map((a) => (
-            <Button key={a.id} asChild size="sm" variant="secondary" className="rounded-full">
-              <a href={downloadUrl(a.id)} download={a.name}><Download className="mr-1.5 h-3.5 w-3.5" />{a.name} <span className="ml-1 text-muted-foreground">{fmt(a.size)}</span></a>
-            </Button>
+            <ArtifactButton key={a.id} id={a.id} name={a.name} size={fmt(a.size)} />
           ))}
         </div>
       )}
