@@ -71,7 +71,7 @@ export default function CodeBlock({ code, language, filename, children, copyText
         {children ?? <pre className="m-0 overflow-hidden whitespace-pre p-4"><code className="hljs bg-transparent p-0 font-mono" style={{ fontSize: font, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: hl.html }} /></pre>}
       </div>
       <div className="absolute inset-x-0 bottom-0 hidden h-7 items-center justify-between gap-2 border-t border-border bg-background/95 px-3 font-mono text-[11px] text-muted-foreground md:flex"><span className="truncate">{name}</span><span className="shrink-0">{code.split("\n").length} lines</span></div>
-      {open && <FullScreenCodeView code={code} language={lang} filename={filename} initialView={initialView} onClose={() => setOpen(false)} />}
+      {open && <FullScreenCodeView code={code} language={lang} filename={filename} initialView={initialView} copyText={copyText} copyHtml={copyHtml} onClose={() => setOpen(false)} />}
     </div>
   );
 }

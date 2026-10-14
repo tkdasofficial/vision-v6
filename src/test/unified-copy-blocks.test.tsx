@@ -32,6 +32,15 @@ describe("Shared copy block behavior", () => {
     expect(screen.queryByRole("button", { name: "Preview code" })).toBeNull();
   });
 
+  it("keeps Markdown copying clean in the expanded viewer too", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<MarkdownReply>{"```markdown\nHello **Sam**.\n```"}</MarkdownReply>);
+    fireEvent.click(screen.getByRole("button", { name: "Open code full screen" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Copy", exact: true }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith("Hello Sam."));
+  });
+
   it.each([["md", "Markdown"], ["html", "HTML"], ["csv", "CSV"], ["yml", "YAML"], ["txt", "Text"]])("resolves %s to its format name", (language, name) => {
     expect(codeLanguageLabel(language)).toBe(name);
   });

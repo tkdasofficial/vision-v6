@@ -10,11 +10,11 @@ import PreviewPane from "@/components/chat/preview-pane";
 import { cn } from "@/lib/utils";
 import { codeLanguageLabel } from "@/lib/code-language-label";
 
-type Props = { code: string; language?: string; filename?: string; html?: string; previewHTML?: string; iframeRef?: Ref<HTMLIFrameElement>; initialView?: "code" | "preview" | "split"; onClose: () => void };
+type Props = { code: string; language?: string; filename?: string; html?: string; previewHTML?: string; iframeRef?: Ref<HTMLIFrameElement>; initialView?: "code" | "preview" | "split"; copyText?: string; copyHtml?: () => string | undefined; onClose: () => void };
 const MIN = 8, MAX = 32, BASE = 13;
 const clamp = (n: number) => Math.min(MAX, Math.max(MIN, n));
 
-export default function FullScreenCodeView({ code, language, filename, previewHTML, iframeRef, initialView = "code", onClose }: Props) {
+export default function FullScreenCodeView({ code, language, filename, previewHTML, iframeRef, initialView = "code", copyText, copyHtml, onClose }: Props) {
   const { copied, copy } = useCopy();
   const name = filenameFor(language, filename);
   const [size, setSize] = useState(BASE);
@@ -60,7 +60,7 @@ export default function FullScreenCodeView({ code, language, filename, previewHT
         <div className="flex shrink-0 gap-1">
           <Button variant="ghost" size="icon" className="code-viewer-action rounded-full md:hidden" disabled={!preview} aria-label={view === "preview" ? "Show code" : "Preview"} title={view === "preview" ? "Show code" : "Preview"} aria-pressed={view === "preview"} onClick={() => setView(view === "preview" ? "code" : "preview")}>{view === "preview" ? <Code2 /> : <Eye />}</Button>
           <Button variant="ghost" size="icon" className="code-viewer-action rounded-full md:rounded-md" onClick={() => downloadText(code, name)} aria-label={`Download ${name}`} title="Download file"><Download /></Button>
-          <Button variant="ghost" size="icon" className="code-viewer-action rounded-full md:rounded-md" onClick={() => copy(code)} aria-label={copied ? "Copied" : "Copy"} title={copied ? "Copied" : "Copy code"}>{copied ? <Check /> : <Copy />}</Button>
+          <Button variant="ghost" size="icon" className="code-viewer-action rounded-full md:rounded-md" onClick={() => copy(copyText ?? code, copyHtml?.())} aria-label={copied ? "Copied" : "Copy"} title={copied ? "Copied" : "Copy code"}>{copied ? <Check /> : <Copy />}</Button>
         </div>
       </header>
       <div className="hidden shrink-0 flex-wrap items-center justify-between gap-1 border-b border-border bg-muted/30 px-2 py-1.5 md:flex">
