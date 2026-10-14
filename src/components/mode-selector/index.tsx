@@ -25,7 +25,7 @@ type Props = { selectedMode: ChatMode; onModeChange: (mode: ChatMode) => void };
 export default function ModeSelector({ selectedMode, onModeChange }: Props) {
   const current = CHAT_MODES.find((m) => m.id === selectedMode);
   const active = selectedMode !== "default" && current;
-  const CurrentIcon = ICONS[selectedMode];
+  const CurrentIcon = active ? ICONS[selectedMode] : undefined;
 
   return (
     <div className="flex items-center gap-1">
