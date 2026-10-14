@@ -47,7 +47,7 @@ export function rowsToTree(rows: Rows): Record<string, unknown>[] {
   const head = h.map((x, i) => String(x ?? "") || `column${i + 1}`);
   return b.map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] === "" || r[i] === undefined ? null : typeof r[i] === "string" ? autoType(r[i] as string) : r[i]])));
 }
-function htmlTables(s: string): Rows {
+export function htmlTables(s: string): Rows {
   const t = s.match(/<table[\s\S]*?<\/table>/i)?.[0] ?? fail("No table found in the HTML.");
   return [...t.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => [...m[0].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((c) => c[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").trim()));
 }
@@ -150,9 +150,9 @@ export function rtfText(s: string): string {
       if (m[1] && /^(fonttbl|colortbl|stylesheet|info|pict|header|footer|generator)$/.test(m[1])) { skip.push(depth); continue; }
       if (m[5] === "*") { skip.push(depth); continue; }
       if (m[1] === "par" || m[1] === "line") out += "\n"; else if (m[1] === "tab") out += "\t";
-      else if (m[1] === "u") out += String.fromCharCode(((Number(m[2]) % 65536) + 65536) % 65536);
+      else if (m[1] === "u") { out += String.fromCharCode(((Number(m[2]) % 65536) + 65536) % 65536); if (s[i + 1] === "?") i++; }
       else if (m[3]) out += String.fromCharCode(parseInt(m[3], 16)); else if (m[5] && "\\{}".includes(m[5])) out += m[5];
-      i--; continue;
+      continue;
     }
     if (skip.length || c === "\r" || c === "\n") continue;
     out += c;
@@ -484,7 +484,7 @@ export function read(from: string, name: string, bytes: Uint8Array): Inter {
     case "odp": return { kind: "doc", title, md: odpText(bytes) };
     case "fb2": { const x = s(); if (!/<FictionBook/i.test(x)) fail("This is not a FictionBook file."); const t = x.match(/<book-title>([\s\S]*?)<\/book-title>/)?.[1] ?? title; const body = x.match(/<body[^>]*>([\s\S]*?)<\/body>/)?.[1] ?? ""; return { kind: "doc", title: xmlText(t), md: `# ${xmlText(t)}\n\n` + body.replace(/<title>([\s\S]*?)<\/title>/g, (_, h) => `\n\n## ${xmlText(h).trim()}\n\n`).replace(/<p>([\s\S]*?)<\/p>/g, (_, p) => `${xmlText(p)}\n\n`).replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim() }; }
     case "tex": { const x = s(); const body = x.match(/\\begin\{document\}([\s\S]*?)\\end\{document\}/)?.[1] ?? x; return { kind: "doc", title: x.match(/\\title\{([^}]*)\}/)?.[1] ?? title, md: body.replace(/%.*$/gm, "").replace(/\\(sub)*section\*?\{([^}]*)\}/g, (_, sub, h) => `\n${"#".repeat(2 + (sub ? sub.length / 3 : 0))} ${h}\n`).replace(/\\textbf\{([^}]*)\}/g, "**$1**").replace(/\\(emph|textit)\{([^}]*)\}/g, "*$2*").replace(/\\item\s*/g, "- ").replace(/\\(begin|end)\{[^}]*\}/g, "").replace(/\\maketitle|\\\\/g, "").replace(/\\[a-zA-Z]+\*?(\[[^\]]*\])?(\{([^}]*)\})?/g, "$3").replace(/\n{3,}/g, "\n\n").trim() }; }
-    case "mmd": case "puml": case "dot": return { kind: "doc", title, md: s() };
+    case "mmd": case "puml": case "dot": case "svg": return { kind: "doc", title, md: s() };
     case "drawio": return { kind: "tree", value: parseDrawio(s()) };
     case "dxf": return { kind: "tree", value: dxfInfo(s()) };
     case "zip": case "cbz": return { kind: "files", files: Object.entries(unzipSafe(bytes)).filter(([p]) => !p.endsWith("/")).map(([path, b]) => ({ path, bytes: b })) };
@@ -501,7 +501,7 @@ export type Out = { name: string; mime: string; bytes: Uint8Array; note?: string
 const T = (name: string, s: string, mime: string): Out => ({ name, mime, bytes: strToU8(s) });
 
 function asRows(i: Inter): Rows {
-  if (i.kind === "table") return i.rows;
+  if (i.kind === "table") return i.rows.map((r, n) => (n ? r.map((c) => (typeof c === "string" ? autoType(c) : c)) : r));
   if (i.kind === "tree") return treeToRows(i.value);
   if (i.kind === "cues") return [["start", "end", "text"], ...i.cues.map((c) => [fmtT(c.start, "."), fmtT(c.end, "."), c.text])];
   if (i.kind === "geo") return parseCsv(writeGeo("csv", i.features), ",");

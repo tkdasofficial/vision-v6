@@ -258,7 +258,7 @@ export const TOOLS: Tool[] = [
     const nm = P.slugify(base(f.name)) || "converted";
     let out: WorkFile;
     if (fmt.id === "cbz" && to === "pdf") {
-      const pages = Object.entries((F.read("cbz", f.name, f.bytes) as any).files as { path: string; bytes: Uint8Array }[]).map(([, v]) => v).filter((x) => /\.(jpe?g|png)$/i.test(x.path)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+      const pages = ((F.read("cbz", f.name, f.bytes) as any).files as { path: string; bytes: Uint8Array }[]).filter((x) => /\.(jpe?g|png)$/i.test(x.path)).sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
       if (!pages.length) throw new Error("The comic has no JPEG/PNG pages.");
       const doc = await PDFDocument.create();
       for (const pg of pages) { const png = P.sniffType(pg.bytes)?.ext === "png"; const im = png ? await doc.embedPng(pg.bytes) : await doc.embedJpg(pg.bytes); doc.addPage([im.width, im.height]).drawImage(im, { x: 0, y: 0, width: im.width, height: im.height }); }
@@ -276,7 +276,7 @@ export const TOOLS: Tool[] = [
       const md = fmt.id === "md" || fmt.id === "txt" ? strFromU8(f.bytes) : await textOf(f, c);
       if (to === "rtf") out = txt(`${nm}.rtf`, F.textToRtf(md), "application/rtf"); else { out = await buildDocument(to, base(f.name), md); out.name = `${nm}.${ext(out.name)}`; }
     } else {
-      const inter = fmt.id === "html" ? { kind: "table" as const, rows: (await import("@/lib/formats/convert")).mdTable("") .length ? [] : (() => { const h = strFromU8(f.bytes); const t = h.match(/<table[\s\S]*?<\/table>/i)?.[0]; if (!t) throw new Error("No table found in the HTML."); return [...t.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => [...m[0].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((x) => x[1].replace(/<[^>]+>/g, "").trim())); })() } : F.read(fmt.id, f.name, f.bytes);
+      const inter = fmt.id === "html" ? { kind: "table" as const, rows: F.htmlTables(strFromU8(f.bytes)) } : F.read(fmt.id, f.name, f.bytes);
       const w = F.write(to, inter, nm, fmt.id);
       if ("doc" in w) { out = await buildDocument(w.doc.format, w.doc.title, w.doc.md); out.name = `${nm}.${ext(out.name)}`; }
       else out = { name: w.name, mime: w.mime, bytes: w.bytes };
