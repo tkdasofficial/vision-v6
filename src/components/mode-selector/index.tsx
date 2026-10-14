@@ -1,10 +1,22 @@
-import { Gauge, Brain, BookOpen, Code, Check, ChevronDown } from "lucide-react";
+import { Brain, BookOpen, Code, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CHAT_MODES, type ChatMode } from "@/lib/ai/modes";
 
-const ICONS: Record<ChatMode, React.ElementType> = { default: Gauge, deep: Brain, research: BookOpen, coding: Code };
+/** Idle-state icon: the 4-cube dice look (2×2 rounded squares). */
+function DiceIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
+      <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
+      <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
+      <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+    </svg>
+  );
+}
+
+const ICONS: Record<Exclude<ChatMode, "default">, React.ElementType> = { deep: Brain, research: BookOpen, coding: Code };
 const PICKABLE = CHAT_MODES.filter((m) => m.id !== "default");
 
 type Props = { selectedMode: ChatMode; onModeChange: (mode: ChatMode) => void };
@@ -13,7 +25,7 @@ type Props = { selectedMode: ChatMode; onModeChange: (mode: ChatMode) => void };
 export default function ModeSelector({ selectedMode, onModeChange }: Props) {
   const current = CHAT_MODES.find((m) => m.id === selectedMode);
   const active = selectedMode !== "default" && current;
-  const CurrentIcon = ICONS[selectedMode];
+  const CurrentIcon = selectedMode === "default" ? undefined : ICONS[selectedMode];
 
   return (
     <div className="flex items-center gap-1">
@@ -23,7 +35,7 @@ export default function ModeSelector({ selectedMode, onModeChange }: Props) {
             className={cn("h-8 shrink-0 gap-1.5 rounded-full border transition-colors",
               "data-[state=open]:bg-accent data-[state=open]:text-foreground",
               active ? "border-transparent bg-secondary pl-2.5 pr-2 text-foreground hover:bg-accent [&_svg]:size-4" : "w-8 border-border p-0 text-muted-foreground hover:bg-accent hover:text-foreground [&_svg]:size-[18px]")}>
-            <CurrentIcon className="shrink-0" />
+            {CurrentIcon ? <CurrentIcon className="shrink-0" /> : <DiceIcon className="shrink-0" />}
             {active && <><span className="text-[13px] font-medium leading-none">{current.label}</span><ChevronDown className="size-3.5! opacity-60" /></>}
           </Button>
         </DropdownMenuTrigger>
