@@ -9,7 +9,7 @@ export type RuntimeOp = { id: RuntimeOpId; label: string; maxInput: number; maxO
 
 export const RUNTIME_OPS: Record<RuntimeOpId, RuntimeOp> = {
   checksum: { id: "checksum", label: "Checksum", maxInput: 25 * MB, maxOutput: 0, timeoutMs: 5 * 60_000 },
-  image_convert: { id: "image_convert", label: "Image conversion", maxInput: 25 * MB, maxOutput: 60 * MB, timeoutMs: 5 * 60_000, targets: ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico"] },
+  image_convert: { id: "image_convert", label: "Image conversion", maxInput: 25 * MB, maxOutput: 60 * MB, timeoutMs: 5 * 60_000, targets: ["png", "jpeg", "webp", "gif", "bmp", "tiff", "ico", "avif", "pdf"] },
   video_convert: { id: "video_convert", label: "Video conversion", maxInput: 25 * MB, maxOutput: 100 * MB, timeoutMs: 25 * 60_000, targets: ["mp4", "webm", "mov", "mkv", "m4v", "avi", "wmv", "mpeg", "3gp"] },
   audio_convert: { id: "audio_convert", label: "Audio conversion", maxInput: 25 * MB, maxOutput: 150 * MB, timeoutMs: 20 * 60_000, targets: ["mp3", "wav", "flac", "ogg", "opus", "m4a", "aac", "aiff", "wma"] },
   office_convert: { id: "office_convert", label: "Office document conversion", maxInput: 25 * MB, maxOutput: 60 * MB, timeoutMs: 10 * 60_000, targets: ["pdf", "docx", "doc", "odt", "rtf", "txt", "html", "xlsx", "xls", "ods", "csv", "pptx", "ppt", "odp"] },
@@ -71,13 +71,16 @@ export function detectRuntimeOp(prompt: string, files: { name: string; mime: str
     const op = RUNTIME_OPS[video ? "video_convert" : "image_convert"];
     const any = p.match(/\b(?:to|into|as)\s+\.?([a-z0-9]{2,5})\b/)?.[1];
     const target = targetFormat(prompt, op.targets!);
-    if (!target) {
+    if (!target && any && canonicalId(any)) { /* fall through to the format registry below */ }
+    else if (!target) {
       if (!any) return null;
       return { error: `I can convert ${video ? "videos" : "images"} to ${op.targets!.join(", ").toUpperCase()} — "${any.toUpperCase()}" isn't supported.` };
     }
+    if (target) {
     if (sourceFormat(f.name) === target) return { error: `This file is already ${target.toUpperCase()}.` };
     if (f.size > op.maxInput) return { error: `${video ? "Videos" : "Images"} up to ${op.maxInput / MB} MB can be converted.` };
     return { operation: op.id, params: { target }, fileIndex: 0 };
+    }
   }
   if (wantsConvert) {
     const fmt = formatOfName(f.name);
