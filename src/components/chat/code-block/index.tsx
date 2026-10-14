@@ -8,16 +8,16 @@ import { detectLanguage, highlight } from "@/components/chat/highlight";
 import { codeLanguageLabel } from "@/lib/code-language-label";
 
 type Props = { code: string; language?: string; filename?: string; children?: ReactNode; copyText?: string; copyHtml?: () => string | undefined; label?: string; regionLabel?: string };
-const LINES = 15; // roughly 14–16 lines fill the square
-
-// Square, colourised code canvas. Each code line stays on one line and is clipped at the edge.
+// Content-sized canvas capped at a square. Each code line stays on one line and is clipped at the edge.
 // The canvas never scrolls or zooms itself: tapping, swiping or pinching it opens the full-screen viewer.
 export default function CodeBlock({ code, language, filename, children, copyText, copyHtml, label, regionLabel }: Props) {
   const [open, setOpen] = useState(false);
   const [initialView, setInitialView] = useState<"code" | "preview">("code");
   const { copied, copy } = useCopy();
   const box = useRef<HTMLDivElement>(null);
-  const [font, setFont] = useState(13);
+  const content = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const [clipped, setClipped] = useState(false);
   const lang = useMemo(() => regionLabel ? language : detectLanguage(code, language), [code, language, regionLabel]);
   const hl = useMemo(() => highlight(code, lang), [code, lang]);
   const name = filenameFor(lang, filename);
@@ -25,12 +25,14 @@ export default function CodeBlock({ code, language, filename, children, copyText
   const format = label || codeLanguageLabel(lang);
 
   useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const fit = () => setFont(Math.max(9, Math.min(16, (el.clientHeight - 32) / (LINES * 1.6))));
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
+    const body = content.current;
+    const area = viewport.current;
+    if (!body || !area) return;
+    const measure = () => setClipped(body.scrollHeight > area.clientHeight + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(body);
+    ro.observe(area);
     return () => ro.disconnect();
   }, []);
 
@@ -54,23 +56,29 @@ export default function CodeBlock({ code, language, filename, children, copyText
   }, []);
 
   return (
-    <div ref={box} role={regionLabel ? "region" : undefined} aria-label={regionLabel} className="code-canvas relative my-3 aspect-square w-full max-w-full overflow-hidden rounded-lg border border-border">
-      <header className="absolute inset-x-0 top-0 z-10 flex h-11 items-center gap-1 border-b border-border bg-background/95 px-2">
-        <span className="min-w-0 flex-1 truncate px-1 font-mono text-xs" title={`${format} · ${name}`}>{format}</span>
+    <div ref={box} role={regionLabel ? "region" : undefined} aria-label={regionLabel} className="content-block my-3 w-full min-w-0 max-w-full">
+      <div className="code-canvas content-block-frame relative flex max-h-[100cqw] flex-col overflow-hidden rounded-lg border border-border">
+      <header className="content-block-header relative z-10 flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
+        <span className="min-w-0 flex-1 truncate px-2 font-mono text-xs font-medium" title={`${format} · ${name}`}>{format}</span>
         {canPreview && <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label="Preview code" title="Preview code" onClick={() => { setInitialView("preview"); setOpen(true); }}><Eye /></Button>}
         <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label="Download code" title="Download code" onClick={() => downloadText(code, name)}><Download /></Button>
         <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label={copied ? "Copied" : regionLabel ? `Copy ${format}` : "Copy code"} title={copied ? "Copied" : `Copy ${format}`} onClick={() => copy(copyText ?? code, copyHtml?.())}>{copied ? <Check /> : <Copy />}</Button>
         <Button variant="ghost" size="icon" className="hidden size-8 rounded-md md:inline-flex" aria-label="Expand code" title="Expand code" onClick={() => { setInitialView("code"); setOpen(true); }}><Expand /></Button>
       </header>
       <div
+        ref={viewport}
         role="button" tabIndex={0} aria-label="Open code full screen"
         onClick={() => { setInitialView("code"); setOpen(true); }}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
-        className="absolute inset-x-0 bottom-0 top-11 cursor-zoom-in overflow-hidden focus-visible:outline-2 focus-visible:outline-ring md:bottom-7"
+        className="relative min-h-0 shrink cursor-zoom-in overflow-hidden focus-visible:outline-2 focus-visible:outline-ring"
       >
-        {children ?? <pre className="m-0 overflow-hidden whitespace-pre p-4"><code className="hljs bg-transparent p-0 font-mono" style={{ fontSize: font, lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: hl.html }} /></pre>}
+        <div ref={content} className="content-block-body flow-root">
+          {children ?? <pre className="m-0 overflow-hidden whitespace-pre p-4"><code className="hljs bg-transparent p-0 font-mono text-[13px] leading-[1.7]" dangerouslySetInnerHTML={{ __html: hl.html }} /></pre>}
+        </div>
+        {clipped && <div aria-hidden="true" className="content-block-fade pointer-events-none absolute inset-x-0 bottom-0 h-10" />}
       </div>
-      <div className="absolute inset-x-0 bottom-0 hidden h-7 items-center justify-between gap-2 border-t border-border bg-background/95 px-3 font-mono text-[11px] text-muted-foreground md:flex"><span className="truncate">{name}</span><span className="shrink-0">{code.split("\n").length} lines</span></div>
+      <div className="content-block-footer hidden h-7 shrink-0 items-center justify-between gap-2 border-t border-border px-4 font-mono text-[11px] text-muted-foreground md:flex"><span className="truncate">{name}</span><span className="shrink-0">{code.split("\n").length} {code.includes("\n") ? "lines" : "line"}</span></div>
+      </div>
       {open && <FullScreenCodeView code={code} language={lang} filename={filename} initialView={initialView} copyText={copyText} copyHtml={copyHtml} onClose={() => setOpen(false)} />}
     </div>
   );

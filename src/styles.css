@@ -383,6 +383,19 @@ button { transition-property: color, background-color, border-color, opacity, bo
 .code-canvas .hljs-type, .code-canvas .hljs-params, .code-canvas .hljs-symbol, .code-canvas .hljs-bullet { color: var(--cc-type); }
 .code-canvas header { border-color: var(--cc-line); }
 .code-canvas header button, .code-canvas header span { color: var(--cc-fg); }
+.content-block { container-type: inline-size; }
+.content-block-frame {
+  --block-toolbar: color-mix(in srgb, var(--cc-bg) 55%, hsl(var(--background)));
+  --block-border: color-mix(in srgb, var(--cc-line) 70%, transparent);
+  --block-shadow: 0 2px 8px color-mix(in srgb, var(--cc-fg) 4%, transparent), 0 0 0 1px color-mix(in srgb, var(--cc-bg) 70%, transparent) inset;
+  border-color: var(--block-border);
+  box-shadow: var(--block-shadow);
+}
+.content-block-header, .content-block-footer { background: var(--block-toolbar); border-color: var(--block-border); }
+.content-block-frame .content-block-header { border-color: var(--block-border); }
+.content-block-body > div > :first-child { margin-top: 0; }
+.content-block-body > div > :last-child { margin-bottom: 0; }
+.content-block-fade { background: linear-gradient(to bottom, transparent, var(--cc-bg)); }
 .code-viewer { background: var(--cc-bg); color: var(--cc-fg); }
 .code-viewer section[aria-label="Preview panel"], .code-viewer .preview-workspace, .code-viewer .preview-frame { background: var(--cc-bg); color: var(--cc-fg); }
 .code-viewer-header { background: var(--cc-bg); }
