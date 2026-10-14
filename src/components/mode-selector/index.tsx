@@ -7,11 +7,11 @@ import { CHAT_MODES, type ChatMode } from "@/lib/ai/modes";
 /** Idle-state icon: the 4-cube dice look (2×2 rounded squares). */
 function DiceIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" className={className} aria-hidden="true">
-      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
-      <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
-      <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
-      <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <rect x="3" y="3" width="7.5" height="7.5" rx="2.4" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="2.4" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="2.4" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2.4" />
     </svg>
   );
 }
