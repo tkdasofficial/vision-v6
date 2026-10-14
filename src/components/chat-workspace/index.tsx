@@ -9,6 +9,8 @@ import AnnouncementBanner from "@/components/announcement-banner";
 
 import type { AITool, ChatMessage as ChatMessageType, DeepStage, MessageAttachment, PastedBlock } from "@/lib/types";
 import { routeRequest } from "@/lib/ai/request-route";
+import { planPluginSend, PLUGIN_BY_ID } from "@/lib/plugins/manifest";
+const tagged = (ids: string[] | undefined, text: string) => [...(ids ?? []).map((i) => `@${PLUGIN_BY_ID.get(i)?.name ?? i}`), text].filter(Boolean).join(" ");
 import { Button } from "@/components/ui/button";
 import { useChatHistory } from "@/context/ChatHistoryContext";
 import ChatInput from "@/components/chat-input";
@@ -258,24 +260,31 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     for (const id of activeJobs) cancelJob(id).catch(() => undefined).finally(() => trackJob(id, false));
   }, [activeJobs, trackJob]);
 
-  const handleSend = useCallback(async (content: string, imageData?: { base64: string; mimeType: string }, taskMode?: ChatMode, extras?: { typed: string; pasted: PastedBlock[] }) => {
+  const handleSend = useCallback(async (content: string, imageData?: { base64: string; mimeType: string }, taskMode?: ChatMode, extras?: { typed: string; pasted: PastedBlock[] }, plugins?: string[]) => {
+    const plan = plugins?.length ? planPluginSend(plugins, content, []) : null;
+    const forceSearch = plan?.kind === "chat" && plan.webSearch;
     const userMsg: ChatMessageType = {
       id: Date.now().toString(),
       role: "user",
-      content,
+      content: plan ? tagged(plugins, content) : content,
       timestamp: new Date(),
       toolId: tool?.id,
       imageUrl: imageData ? `data:${imageData.mimeType};base64,${imageData.base64}` : undefined,
       ...(extras?.pasted.length ? { pasted: extras.pasted, typed: extras.typed } : {}),
     };
     setMessages((prev) => [...prev, userMsg]);
+    if (plan?.kind === "reply" || (plan?.kind === "agent" && isIncognito)) {
+      const text = plan.kind === "reply" ? plan.text : "Plugins that run tasks aren't available in private chats.";
+      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: text, timestamp: new Date() }]);
+      return;
+    }
 
     // Private chats get real AI replies but never create saved rows or background jobs.
     if (isIncognito) {
       setIsTyping(true);
       const history = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }));
       try {
-        const reply = await streamChat(history, () => {}, tool?.id, { mode: taskMode });
+        const reply = await streamChat(history, () => {}, tool?.id, { mode: taskMode, webSearch: forceSearch });
         setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: reply || "I couldn't come up with an answer.", timestamp: new Date() }]);
       } catch (e: any) {
         setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Sorry, an error occurred: ${e.message}`, timestamp: new Date() }]);
@@ -316,7 +325,12 @@ const ChatWorkspace = ({ tool, onMenuClick, initialMessages, chatId: externalCha
     };
 
     // Explicit tools, files and projects run as backend jobs; everything else is a written answer.
-    const route = routeRequest(content, taskMode ?? "default");
+    if (plan?.kind === "agent") {
+      clearPhaseTimers(); setIsTyping(false);
+      await runInlineJob("agent_task", { prompt: plan.prompt }, sessionId);
+      return;
+    }
+    const route = plan ? ({ kind: "chat" } as const) : routeRequest(content, taskMode ?? "default");
     if (route.kind !== "chat") {
       clearPhaseTimers();
       setIsTyping(false);
