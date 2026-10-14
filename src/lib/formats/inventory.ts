@@ -208,6 +208,8 @@ export function routeConversion(from: string, to: string): Route {
   if (tgt === from) return { where: "unsupported", reason: `The file is already ${src.name}.` };
   if (src.inline.includes(tgt)) return { where: "inline" };
   if (src.runtime?.targets.includes(tgt)) return { where: "runtime", op: src.runtime.op };
+  // Audio track extraction from a user's video (decode + encode only).
+  if (src.category === "video" && FORMAT_BY_ID.get(tgt)?.category === "audio" && tgt !== "wma" && tgt !== "aiff") return { where: "runtime", op: "audio_convert" };
   const all = [...new Set([...src.inline, ...(src.runtime?.targets ?? [])])];
   return { where: "unsupported", reason: all.length ? `${src.name} can be converted to ${all.map((t) => t.toUpperCase()).join(", ")} — not ${tgt.toUpperCase()}.` : `${src.name} files can be read and inspected but not converted.` };
 }
