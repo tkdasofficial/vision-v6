@@ -42,5 +42,5 @@ export function routeRequest(content: string, mode: ChatMode = "default"): Reque
 
 /** True when the user explicitly asks for sources/citations/references (not "source code"). */
 export function asksForSources(text: string): boolean {
-  return /\b(cite|citations?|with sources|(?:give|list|include|provide|add|show)\s+(?:me\s+)?(?:the\s+|your\s+)?(?:sources?|references?)(?!\s*code)|sources?\s+please)\b/i.test(text);
+  return /\b(cite|citations?|with sources|(?:give|list|include|provide|add|show)\s+(?:me\s+)?(?:the\s+|your\s+)?(?:sources?|references?)(?!\s*code)|sources?\s+please|web\s*search|search\s+(?:the\s+)?(?:web|internet|online)|latest|recent\s+news|news\s+(?:about|on)|updates?\s+(?:about|on))\b/i.test(text);
 }
