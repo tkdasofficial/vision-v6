@@ -16,6 +16,8 @@ import { usePlugins } from "@/hooks/usePlugins";
 import PluginIcon from "@/components/plugin-icon";
 import { PLUGIN_BY_ID } from "@/lib/plugins/manifest";
 import { Plus } from "lucide-react";
+import { Popover, PopoverAnchor } from "@/components/ui/popover";
+import PluginPicker from "@/components/plugin-picker";
 
 type Props = {
   toolName?: string;
@@ -41,7 +43,8 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
   const [value, setValue] = useState("");
   const [attachedImage, setAttachedImage] = useState<{ base64: string; mimeType: string; preview: string; file?: File } | null>(null);
   const [plugins, setPlugins] = useState<string[]>([]);
-  const { added: addedPlugins } = usePlugins();
+  const { added: addedPlugins, loading: pluginsLoading } = usePlugins();
+  const [pluginsOpen, setPluginsOpen] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [pasted, setPasted] = useState<PastedBlock[]>([]);
   const [localMode, setLocalMode] = useState<ChatMode>("default");
@@ -181,8 +184,12 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
   const updateMention = (text: string, caret: number) => { const m = findMention(text, caret); setMention(m); if (!m || m.query !== mention?.query) setMentionIndex(0); };
   const pickPlugin = (id: string) => {
     const el = textareaRef.current;
-    if (!mention || !el) return;
     setPlugins((cur) => (cur.includes(id) ? cur : [...cur, id]));
+    setPluginsOpen(false);
+    if (!mention || !el) {
+      requestAnimationFrame(() => el?.focus());
+      return;
+    }
     const next = removeMention(value, mention.start, el.selectionStart ?? value.length);
     setValue(next.text); finalTranscriptRef.current = next.text; setMention(null);
     requestAnimationFrame(() => { el.focus(); el.setSelectionRange(next.caret, next.caret); autoResize(); });
@@ -287,6 +294,8 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
             ))}
           </div>
         )}
+        <Popover open={pluginsOpen} onOpenChange={setPluginsOpen}>
+        <PopoverAnchor asChild><div>
         <PromptInput onSubmit={() => handleSend()} className="[&_[data-slot=input-group]]:rounded-[24px] [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-none [&_[data-slot=input-group]]:ring-0! [&_[data-slot=input-group]]:focus-within:border-foreground/20">
           {/* Attachments and pasted prompts: same look as in the sent message */}
           {showTray && (
@@ -301,7 +310,7 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
                   <RemoveBtn label={`Remove ${f.name}`} onClick={() => setAttachedFiles((cur) => cur.filter((_, j) => j !== i))} />
                 </FileChip>
               ))}
-              {plugins.map((id) => { const p = PLUGIN_BY_ID.get(id)!; return (
+              {plugins.map((id) => { const p = PLUGIN_BY_ID.get(id); if (!p) return null; return (
                 <span key={id} className="relative flex h-[44px] items-center gap-2 rounded-full border border-border bg-card pl-1.5 pr-4">
                   <PluginIcon plugin={p} className="size-8 rounded-full" />
                   <span className="text-sm font-medium text-foreground">{p.name}</span>
@@ -349,6 +358,7 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
                 className="hidden"
               />
               <AttachMenu
+                onOpenPlugins={() => { setMention(null); setPluginsOpen(true); }}
                 imageOnly={false}
                 onPick={(kind) => {
                   const el = fileInputRef.current;
@@ -415,6 +425,9 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
             </div>
           </PromptInputFooter>
         </PromptInput>
+        </div></PopoverAnchor>
+        <PluginPicker plugins={addedPlugins} loading={pluginsLoading} onPick={pickPlugin} onClose={() => textareaRef.current?.focus()} />
+        </Popover>
 
         {<p className="text-[11px] text-muted-foreground text-center mt-2 hidden sm:block">
           Vision may produce inaccurate results. Verify important information.

@@ -1,7 +1,6 @@
 import { Image as ImageIcon, Clapperboard, Paperclip, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useNavigate } from "@/lib/router-compat";
 
 export type AttachKind = "image" | "video" | "file";
 
@@ -14,8 +13,7 @@ export const ACCEPT: Record<AttachKind, string> = {
 };
 
 /** "+" button opening Image / Video / File / Plugins. */
-export default function AttachMenu({ onPick, imageOnly }: { onPick: (kind: AttachKind) => void; imageOnly?: boolean }) {
-  const navigate = useNavigate();
+export default function AttachMenu({ onPick, onOpenPlugins, imageOnly }: { onPick: (kind: AttachKind) => void; onOpenPlugins: () => void; imageOnly?: boolean }) {
   const items = [
     { kind: "image" as const, label: "Image", icon: ImageIcon },
     ...(imageOnly ? [] : [
@@ -38,7 +36,7 @@ export default function AttachMenu({ onPick, imageOnly }: { onPick: (kind: Attac
           </DropdownMenuItem>
         ))}
         {!imageOnly && (
-          <DropdownMenuItem onSelect={() => navigate("/integrations")} className="gap-3 rounded-2xl px-2 py-2 text-[15px] font-medium">
+          <DropdownMenuItem onSelect={() => requestAnimationFrame(onOpenPlugins)} className="gap-3 rounded-2xl px-2 py-2 text-[15px] font-medium">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary"><AtSign className="size-5 text-foreground" /></span>Plugins
           </DropdownMenuItem>
         )}
