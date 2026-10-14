@@ -515,3 +515,7 @@ Database schema: `db/schema.sql` (apply with `wrangler d1 execute vision --remot
 ├── vite.config.ts
 └── vitest.config.ts
 ```
+
+## File-format capabilities
+
+See [docs/formats/README.md](docs/formats/README.md) for the audited inventory, conversion matrix, and verification status.
