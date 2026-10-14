@@ -3,7 +3,7 @@
 // Scored from several signals (action + artifact + audience/use, minus "asking about"), not single keywords.
 
 export type ContentIntent = "deliverable" | "code" | "data" | "general";
-export type IntentResult = { intent: ContentIntent; category?: string; dataFormat?: string; rawMarkdown: boolean };
+export type IntentResult = { intent: ContentIntent; category?: string; dataFormat?: string; rawMarkdown: boolean; single?: boolean };
 
 const CREATE = /\b(write|draft|create|compose|generate|make|give me|prepare|craft|come up with|produce|design|build|need|want|suggest|send me|i need|can you (?:write|draft|make|create))\b/i;
 const TRANSFORM = /\b(translate|rewrite|rephrase|paraphrase|proofread|correct (?:the )?grammar|fix (?:the )?grammar|polish|shorten|expand|summari[sz]e (?:this|it) (?:for|into|as)|make (?:it|this) (?:more )?(?:formal|professional|casual|polite|shorter|longer|friendly)|tone)\b/i;
@@ -51,13 +51,20 @@ export function detectContentIntent(text: string, previousText?: string): Intent
     return { intent: "code", rawMarkdown };
   }
   if (asking && !create && !transform) return { intent: "general", rawMarkdown };
-  if (transform && !EXPLAIN.test(own)) return { intent: "deliverable", category: category ?? "rewrite", rawMarkdown };
-  if (create && category) return { intent: "deliverable", category, rawMarkdown };
+  if (transform && !EXPLAIN.test(own)) return { intent: "deliverable", category: category ?? "rewrite", rawMarkdown, single: isSingle(own) };
+  if (create && category) return { intent: "deliverable", category, rawMarkdown, single: isSingle(own) };
   return { intent: "general", rawMarkdown };
 }
 
+const MANY = /\b(\d+|two|three|four|five|six|seven|eight|nine|ten|several|multiple|a few|some|couple of)\s+(?:\w+[\s-]+){0,3}?(prompts|emails|captions|stories|messages|versions|options|variations|letters|scripts|posts|poems|slogans|taglines|bios|titles|tweets|replies|ideas|examples)\b|\bexplain\b|\bwhy\b|\bhow (?:to|does|do)\b|\b(?:and|also|plus) (?:tell|describe|list)\b/i;
+/** One deliverable with nothing else requested: the server can wrap the whole reply in a single copy box. */
+function isSingle(text: string) { return !MANY.test(text); }
+
 /** System-prompt addendum for the detected intent (appended to the existing mode prompt). */
 export function intentAddendum(r: IntentResult): string {
+  if (r.intent === "deliverable" && r.single) {
+    return `\n\nCopy-ready deliverable: the user wants one piece of reusable ${r.category} content to copy, send, publish or paste elsewhere. Reply with ONLY the finished deliverable itself — no introduction, no closing remarks, no notes, no alternatives, and no code fences around it: the app places your whole reply in a copy box. ${r.rawMarkdown ? "Write it as literal Markdown source." : "Use Markdown structure only where it suits the content (title, headings, lists, emphasis); don't force headings."} For translations or rewrites output only the new version, not the original. Respect every stated constraint (language, word/line/scene counts, names, tone, required headings) and count before replying.`;
+  }
   if (r.intent === "deliverable") {
     return `\n\nCopy-ready deliverable: the user wants reusable ${r.category} content they will copy, send, publish or paste elsewhere. Put the complete finished deliverable inside ONE fenced block tagged ${r.rawMarkdown ? "text (the user asked for raw Markdown source, so keep the Markdown syntax literal)" : "markdown"} — one block per separate deliverable they asked for (for example two emails → two blocks). Use Markdown structure inside only where it suits the content (headings, lists, emphasis, tables); don't force headings. That block is the only copy: never repeat, quote or summarise the deliverable in plain text before or after it, never add alternative versions unless asked, and keep any surrounding text to at most one short line. For translations or rewrites, output only the new version, not the original. Respect every stated constraint (language, word/line/scene counts, names, tone, required headings) and only claim a constraint was checked if you actually counted.`;
   }

@@ -155,3 +155,18 @@ describe("browser download", () => {
     await expect(fetchDownload("/a", (async () => { throw new TypeError("offline"); }) as any)).rejects.toMatchObject({ code: "network" });
   });
 });
+
+describe("single deliverable wrapping", () => {
+  it("single vs multiple deliverables", () => {
+    expect(detectContentIntent("Write a 4-line poem about monsoon rain").single).toBe(true);
+    expect(detectContentIntent("Write two prompts for a cat video").single).toBe(false);
+    expect(detectContentIntent("Explain prompt engineering and write a prompt for a logo").single).not.toBe(true);
+  });
+  it("wraps the streamed reply in exactly one copy fence", async () => {
+    const { wrapCopyReady } = await import("@/lib/ai/copy-ready-stream");
+    const src = new Response('data: {"choices":[{"delta":{"content":"Rain falls."}}]}\n\ndata: [DONE]\n\n').body!;
+    const text = await new Response(wrapCopyReady(src)).text();
+    const content = [...text.matchAll(/^data: (\{.*\})$/gm)].map((m) => JSON.parse(m[1]).choices[0].delta.content).join("");
+    expect(content).toBe("````markdown\nRain falls.\n````\n");
+  });
+});
