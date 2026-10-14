@@ -180,7 +180,8 @@ export const Route = createFileRoute("/api/chat")({
           const r = await streamFromProvider(t, fullMessages, { maxTokens: deep ? 8192 : 4096, deep }, request.signal);
           if (r.ok) {
             const { wrapCopyReady } = await import("@/lib/ai/copy-ready-stream");
-            const body = contentIntent?.intent === "deliverable" && contentIntent.single ? wrapCopyReady(r.body, contentIntent.rawMarkdown ? "text" : "markdown") : r.body;
+            const body0 = contentIntent?.intent === "deliverable" && contentIntent.single ? wrapCopyReady(r.body, contentIntent.rawMarkdown ? "text" : "markdown") : r.body;
+            let dbg = ""; const body = body0.pipeThrough(new TransformStream({ transform(c, k) { dbg += new TextDecoder().decode(c); k.enqueue(c); }, flush() { console.log("[DBG]", t.model, dbg.length, dbg.slice(0, 600), "...", dbg.slice(-600)); } }));
             return new Response(body, {
               headers: {
                 "Content-Type": "text/event-stream",
