@@ -1,10 +1,22 @@
-import { Gauge, Brain, BookOpen, Code, Check, ChevronDown } from "lucide-react";
+import { Brain, BookOpen, Code, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CHAT_MODES, type ChatMode } from "@/lib/ai/modes";
 
-const ICONS: Record<ChatMode, React.ElementType> = { default: Gauge, deep: Brain, research: BookOpen, coding: Code };
+/** Idle-state icon: the 4-cube dice look (2×2 rounded squares). */
+function DiceIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="3.5" y="3.5" width="7.5" height="7.5" rx="2" />
+      <rect x="13" y="3.5" width="7.5" height="7.5" rx="2" />
+      <rect x="3.5" y="13" width="7.5" height="7.5" rx="2" />
+      <rect x="13" y="13" width="7.5" height="7.5" rx="2" />
+    </svg>
+  );
+}
+
+const ICONS: Record<Exclude<ChatMode, "default">, React.ElementType> = { deep: Brain, research: BookOpen, coding: Code };
 const PICKABLE = CHAT_MODES.filter((m) => m.id !== "default");
 
 type Props = { selectedMode: ChatMode; onModeChange: (mode: ChatMode) => void };
