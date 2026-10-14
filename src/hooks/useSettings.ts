@@ -27,6 +27,13 @@ export function useSettings() {
     })();
   }, [user]);
 
+  // Keeps every mounted settings user (Plugins page, chat composer) in sync after a save.
+  useEffect(() => {
+    const on = (e: Event) => setPrefs((e as CustomEvent<Prefs>).detail);
+    window.addEventListener("vision:prefs", on);
+    return () => window.removeEventListener("vision:prefs", on);
+  }, []);
+
   /** Saves a patch; returns true only after the server confirms. */
   const update = useCallback(async (patch: Partial<Prefs>, opts: { quiet?: boolean } = {}) => {
     if (!user) return false;
@@ -39,6 +46,7 @@ export function useSettings() {
     setSaving(false);
     if (error) { setPrefs(prev); applyPrefs(prev); toast.error("Couldn't save. Please try again."); return false; }
     cachePrefs(next);
+    window.dispatchEvent(new CustomEvent("vision:prefs", { detail: next }));
     if (!opts.quiet) toast.success("Saved");
     return true;
   }, [user, prefs]);
