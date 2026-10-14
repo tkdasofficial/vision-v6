@@ -74,7 +74,7 @@ export const FORMATS: Format[] = [
   f("tsv", "TSV", ["tsv", "tab"], "spreadsheet", "text/tab-separated-values", { create: true, inline: without(TABLE, "tsv") }),
   f("json", "JSON", ["json"], "data", "application/json", { create: true, inline: [...without(TABLE, "json"), "ini", "properties", "env"], runtime: { op: "data_convert", targets: ["parquet", "avro", "sqlite"] } }),
   f("jsonl", "JSON Lines", ["jsonl", "ndjson"], "data", "application/x-ndjson", { create: true, inline: without(TABLE, "jsonl") }),
-  f("xml", "XML", ["xml"], "data", "application/xml", { create: true, inline: without([...TABLE, "yaml", "toml"], "xml"), notes: "External entities are never resolved." }),
+  f("xml", "XML", ["xml"], "data", "application/xml", { create: true, inline: without([...TABLE, "yaml", "toml"], "xml").filter((t) => t !== "jsonl"), notes: "External entities are never resolved." }),
   f("yaml", "YAML", ["yaml", "yml"], "config", "application/yaml", { create: true, inline: without([...TABLE, ...TREE], "yaml") }),
   f("toml", "TOML", ["toml"], "config", "application/toml", { create: true, inline: without([...TREE, "csv", "xlsx", "ini"], "toml") }),
   f("sql", "SQL", ["sql"], "data", "application/sql", { create: true, inline: ["csv", "json", "xlsx", "txt", "md", "html", "pdf"], notes: "INSERT statements are parsed into tables; SQL is never executed." }),
