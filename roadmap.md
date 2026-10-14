@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Unify Markdown, text and code copy-block UI and show each format name at the top-left; verify copying and live rendering.
 - [ ] Add App Guide to Help and expand accurate feature/gesture instructions using the shared floating interface; verify guide interactions.
 - [x] Replace Projects Search button with plus and scope pull-down search to Projects; 23 tests pass for routed/overlay gestures, scrolling and filtering. Signed-in browser verification is blocked by the preview session check.
 - [x] Add edge-drag drawer, spring settling and centralized directional navigation/back gestures; 77 tests pass. Chromium touch fixture confirms finger tracking, reverse close, retained draft and one swipe-back call without errors. Signed-in end-to-end verification remains unavailable without a custom-auth session.
