@@ -8,7 +8,7 @@ vi.mock("@/components/mode-selector", () => ({ default: () => null }));
 afterEach(cleanup);
 
 async function openPlugins() {
-  fireEvent.pointerDown(screen.getByRole("button", { name: "Add attachment" }), { button: 0, ctrlKey: false, pointerType: "mouse" });
+  fireEvent.keyDown(screen.getByRole("button", { name: "Add attachment" }), { key: "Enter" });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Plugins" }));
   return screen.findByRole("dialog", { name: "Added plugins" });
 }
