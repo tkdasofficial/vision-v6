@@ -81,3 +81,11 @@ export function springStep(position: number, velocity: number, target: number, s
   }
   return { position, velocity };
 }
+/** Duration (ms) of a full tap-driven panel slide; shorter distances take proportionally less. */
+export const GLIDE_MS = 320;
+/** Eased 0→1 progress of a tap-driven slide: starts at full speed, stops softly, never overshoots. */
+export function glideProgress(elapsedMs: number, distance = 1) {
+  const duration = GLIDE_MS * Math.max(0.45, Math.min(1, distance));
+  const t = Math.min(1, Math.max(0, elapsedMs / duration));
+  return 1 - Math.pow(1 - t, 4);
+}
