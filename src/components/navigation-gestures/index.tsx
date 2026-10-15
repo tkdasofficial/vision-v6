@@ -7,7 +7,7 @@ import AppDrawerView from "@/components/app-drawer";
 import Projects from "@/pages/projects";
 import { isMotionReduced } from "@/lib/app-motion";
 import { classifyRoute, safeReturnPath } from "@/lib/route-access";
-import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
+import { DRAWER_EVENT, GLIDE_EASE, PROJECTS_EVENT, drawerProgress, glideDuration, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
 
@@ -75,7 +75,7 @@ export default function NavigationGestures() {
   // A running tap slide is a browser (compositor) animation, so busy chat work can't make it stutter.
   const motion = useRef<{ animations: Animation[]; from: number; to: number; start: number } | null>(null);
   const stopMotion = () => {
-    cancelAnimationFrame(frame.current);
+    stopMotion();
     const running = motion.current;
     if (!running) return;
     motion.current = null;
@@ -150,7 +150,7 @@ export default function NavigationGestures() {
     const state = location.state as { __TSR_index?: number; __visionOpenDrawer?: boolean; __visionOpenProjects?: boolean } | undefined;
     const prev = previous.current;
     previous.current = { path: location.pathname, index: state?.__TSR_index };
-    cancelAnimationFrame(frame.current); drag.current = null; dismiss();
+    stopMotion(); drag.current = null; dismiss();
     // Closing Library/Plugins/Settings returns to the App Drawer, already open.
     const backFromDrawerPage = prev && gestureSurface(prev.path) === "drawer-page" && state?.__TSR_index !== undefined && prev.index !== undefined && state.__TSR_index < prev.index;
     if (enabled && gestureSurface(location.pathname) === "chat" && (state?.__visionOpenDrawer || backFromDrawerPage)) { show("left"); paint(1); }
@@ -185,7 +185,7 @@ export default function NavigationGestures() {
       const drawer = opened.current || current.current.directDrawer;
       if (!drawer && gestureSurface(current.current.location.pathname) !== "other") {
         // Chat, Projects and drawer pages: swipe from anywhere, except horizontally scrolling content.
-        cancelAnimationFrame(frame.current);
+        stopMotion();
         target.current = event.target;
         drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, time: performance.now(), start: 0, velocity: 0, kind: "pending", active: false };
         return;
@@ -197,7 +197,7 @@ export default function NavigationGestures() {
         ancestor = ancestor.parentElement;
       }
       if (!drawer && !edge && !current.current.router.history.canGoBack()) return;
-      cancelAnimationFrame(frame.current);
+      stopMotion();
       drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, time: performance.now(), start: current.current.directDrawer ? 1 : opened.current ? progress.current : 0, velocity: 0, kind: drawer || edge ? "drawer" : "back", active: false };
     };
     const move = (event: TouchPoint) => {
@@ -300,7 +300,7 @@ export default function NavigationGestures() {
     document.addEventListener("touchcancel", onCancel, true);
     document.addEventListener("click", click, true);
     return () => {
-      cancelAnimationFrame(frame.current);
+      stopMotion();
       document.removeEventListener(DRAWER_EVENT, open);
       document.removeEventListener(PROJECTS_EVENT, openProjects);
       document.removeEventListener(`${DRAWER_EVENT}:back`, back);
