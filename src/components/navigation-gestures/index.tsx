@@ -101,10 +101,11 @@ export default function NavigationGestures() {
       else frame.current = requestAnimationFrame(tick);
     };
     let waited = 0;
+    let settledFrames = 0;
     const ready = () => {
-      // Wait until the panel exists and has painted one frame, then start the slide.
+      // Wait until the panel exists and has painted twice (after its setup work), then slide.
       if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
-      frame.current = requestAnimationFrame(tick);
+      frame.current = requestAnimationFrame(settledFrames++ < 1 ? ready : tick);
     };
     frame.current = requestAnimationFrame(mounting ? ready : tick);
   };
