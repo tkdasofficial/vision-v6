@@ -58,17 +58,31 @@ export default function NavigationGestures() {
   current.current = { enabled, directDrawer, location, navigate, router };
   // Writes only the panel's transform and the scrim's opacity. An inherited CSS variable on the
   // layer restyled every element inside the drawer on every frame, which made it stutter.
+  const panelTransform = (value: number) => `translate3d(${(sideRef.current === "right" ? 1 - value : value - 1) * 100}%, 0, 0)`;
+  const parts = (node: HTMLElement | null) => ({
+    panel: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-panel") ?? null,
+    scrim: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim") ?? null,
+  });
   const applyProgress = (node: HTMLElement | null, value: number) => {
-    if (!node) return;
-    const panel = node.querySelector<HTMLElement>(":scope > .navigation-drawer-panel");
-    const scrim = node.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim");
-    const offset = (sideRef.current === "right" ? 1 - value : value - 1) * 100;
-    if (panel) panel.style.transform = `translate3d(${offset}%, 0, 0)`;
+    const { panel, scrim } = parts(node);
+    if (panel) panel.style.transform = panelTransform(value);
     if (scrim) scrim.style.opacity = String(value);
   };
   const paint = (value: number) => {
     progress.current = value;
     applyProgress(layer.current, value);
+  };
+  // A running tap slide is a browser (compositor) animation, so busy chat work can't make it stutter.
+  const motion = useRef<{ animations: Animation[]; from: number; to: number; start: number } | null>(null);
+  const stopMotion = () => {
+    cancelAnimationFrame(frame.current);
+    const running = motion.current;
+    if (!running) return;
+    motion.current = null;
+    // Freeze where the slide visibly is, so a finger can catch it mid-way.
+    const t = glideProgress(performance.now() - running.start, Math.abs(running.to - running.from));
+    running.animations.forEach((animation) => animation.cancel());
+    paint(running.from + (running.to - running.from) * t);
   };
   const show = (to: "left" | "right" = sideRef.current) => {
     if (opened.current) return;
@@ -79,9 +93,9 @@ export default function NavigationGestures() {
   };
   const dismiss = () => { opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0); };
   const settle = (open: boolean, initialVelocity = 0, to?: "left" | "right") => {
-    cancelAnimationFrame(frame.current);
+    stopMotion();
     // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
-    // mounting never eats the first frames of the slide (the drawer stuttered, Projects didn't).
+    // mounting never eats the first frames of the slide.
     const mounting = open && !opened.current;
     if (open) show(to);
     const target = open ? 1 : 0;
@@ -93,33 +107,40 @@ export default function NavigationGestures() {
       else layer.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
     };
     if (isMotionReduced()) { finish(); return; }
-    // Taps (and still releases) have no finger speed. A spring from rest starts slowly and
-    // drags, so they use the quick glide a flicked Projects swipe has; flicks keep the spring.
+    // Taps (and still releases) have no finger speed: they get the quick glide a flicked
+    // Projects swipe has; flicks keep the spring that continues the finger's speed.
     const glide = Math.abs(initialVelocity) < 0.5;
-    let from = progress.current;
-    let started = -1;
     const tick = (now: number) => {
-      if (glide) {
-        if (started < 0) { started = now; from = progress.current; }
-        const t = glideProgress(now - started, Math.abs(target - from));
-        paint(from + (target - from) * t);
-        if (t >= 1) finish(); else frame.current = requestAnimationFrame(tick);
-        return;
-      }
       // The first frame only records the clock, so a slow frame never becomes a jump.
       const next = previous < 0 ? { position: progress.current, velocity } : springStep(progress.current, velocity, target, (now - previous) / 1000);
       previous = now; velocity = next.velocity; paint(next.position);
       if (Math.abs(target - next.position) < 0.001 && Math.abs(velocity) < 0.01) finish();
       else frame.current = requestAnimationFrame(tick);
     };
+    const slide = () => {
+      const { panel, scrim } = parts(layer.current);
+      const from = progress.current;
+      if (!panel || typeof panel.animate !== "function" || from === target) { finish(); return; }
+      const options: KeyframeAnimationOptions = { duration: glideDuration(Math.abs(target - from)), easing: GLIDE_EASE };
+      const animations = [panel.animate([{ transform: panelTransform(from) }, { transform: panelTransform(target) }], options)];
+      if (scrim) animations.push(scrim.animate([{ opacity: from }, { opacity: target }], options));
+      paint(target); // resting style underneath; the animation covers it until it ends
+      const running = { animations, from, to: target, start: performance.now() };
+      motion.current = running;
+      animations[0].onfinish = () => { if (motion.current !== running) return; motion.current = null; animations.forEach((a) => a.cancel()); finish(); };
+    };
+    const begin = glide ? slide : tick;
     let waited = 0;
     let settledFrames = 0;
     const ready = () => {
       // Wait until the panel exists and has painted twice (after its setup work), then slide.
       if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
-      frame.current = requestAnimationFrame(settledFrames++ < 1 ? ready : tick);
+      if (settledFrames++ < 1) { frame.current = requestAnimationFrame(ready); return; }
+      if (glide) slide(); else frame.current = requestAnimationFrame(tick);
     };
-    frame.current = requestAnimationFrame(mounting ? ready : tick);
+    if (mounting) frame.current = requestAnimationFrame(ready);
+    else if (glide) slide();
+    else frame.current = requestAnimationFrame(begin);
   };
   settleRef.current = settle;
   const sign = () => (sideRef.current === "right" ? -1 : 1);
