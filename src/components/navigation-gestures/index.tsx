@@ -70,10 +70,13 @@ export default function NavigationGestures() {
   const dismiss = () => { opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0); };
   const settle = (open: boolean, initialVelocity = 0, to?: "left" | "right") => {
     cancelAnimationFrame(frame.current);
+    // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
+    // mounting never eats the first frames of the slide (the drawer stuttered, Projects didn't).
+    const mounting = open && !opened.current;
     if (open) show(to);
     const target = open ? 1 : 0;
     let velocity = initialVelocity;
-    let previous = performance.now();
+    let previous = -1;
     const finish = () => {
       paint(target);
       if (!open) dismiss();
@@ -81,12 +84,19 @@ export default function NavigationGestures() {
     };
     if (isMotionReduced()) { finish(); return; }
     const tick = (now: number) => {
-      const next = springStep(progress.current, velocity, target, (now - previous) / 1000);
+      // The first frame only records the clock, so a slow frame never becomes a jump.
+      const next = previous < 0 ? { position: progress.current, velocity } : springStep(progress.current, velocity, target, (now - previous) / 1000);
       previous = now; velocity = next.velocity; paint(next.position);
       if (Math.abs(target - next.position) < 0.001 && Math.abs(velocity) < 0.01) finish();
       else frame.current = requestAnimationFrame(tick);
     };
-    frame.current = requestAnimationFrame(tick);
+    let waited = 0;
+    const ready = () => {
+      // Wait until the panel exists and has painted one frame, then start the slide.
+      if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
+      frame.current = requestAnimationFrame(tick);
+    };
+    frame.current = requestAnimationFrame(mounting ? ready : tick);
   };
   settleRef.current = settle;
   const sign = () => (sideRef.current === "right" ? -1 : 1);
