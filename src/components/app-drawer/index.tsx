@@ -23,15 +23,19 @@ export default function AppDrawerView({ onClose, onNewChat, onSelectChat, active
   const [searching, setSearching] = useState(initialSearch);
   // Drawer content stays mounted during the morph so its exit animation is visible.
   const [drawerVisible, setDrawerVisible] = useState(!initialSearch);
+  // Projects has one panel entrance. Keep drawer children still until an inline search morph.
+  const [morphing, setMorphing] = useState(false);
   const morphTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const openSearch = () => {
+    setMorphing(true);
     setScrolled(false);
     setSearching(true);
     if (morphTimer.current) clearTimeout(morphTimer.current);
     morphTimer.current = setTimeout(() => setDrawerVisible(false), 280);
   };
   const closeSearch = () => {
+    setMorphing(true);
     if (morphTimer.current) clearTimeout(morphTimer.current);
     setDrawerVisible(true);
     setScrolled(false);
@@ -54,7 +58,7 @@ export default function AppDrawerView({ onClose, onNewChat, onSelectChat, active
   };
 
   return <div className="app-drawer relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background text-foreground" data-scrolled={scrolled}>
-    {drawerVisible && <header className={cn("drawer-top absolute inset-x-0 top-0 z-10 px-4 pb-6 pt-[max(12px,env(safe-area-inset-top))] sm:px-8", searching ? "drawer-pane-out" : "drawer-pane-in")}>
+    {drawerVisible && <header className={cn("drawer-top absolute inset-x-0 top-0 z-10 px-4 pb-6 pt-[max(12px,env(safe-area-inset-top))] sm:px-8", morphing && (searching ? "drawer-pane-out" : "drawer-pane-in"))}>
       <div className="mx-auto grid max-w-4xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Button variant="floating" className="h-11 min-w-0 px-5 font-display text-xl font-semibold" onClick={onNewChat}>Vision</Button>
@@ -66,8 +70,8 @@ export default function AppDrawerView({ onClose, onNewChat, onSelectChat, active
       </div>
     </header>}
 
-    {searching && <div className="drawer-pane-in absolute inset-0 z-20 flex flex-col"><WorkspaceSearch topSearch onBack={onSearchBack ?? closeSearch} onScrollChange={setScrolled} /></div>}
-    {drawerVisible && <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-[max(84px,calc(env(safe-area-inset-top)+72px))] sm:px-8", searching ? "drawer-pane-out" : "drawer-pane-in")} onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 8)}>
+    {searching && <div className={cn("absolute inset-0 z-20 flex flex-col", morphing && "drawer-pane-in")}><WorkspaceSearch topSearch onBack={onSearchBack ?? closeSearch} onScrollChange={setScrolled} /></div>}
+    {drawerVisible && <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-[max(84px,calc(env(safe-area-inset-top)+72px))] sm:px-8", morphing && (searching ? "drawer-pane-out" : "drawer-pane-in"))} onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 8)}>
       <div className="mx-auto max-w-4xl">
         <SidebarFeatures />
         <section aria-label="Recent chats" className="mt-9">
@@ -90,7 +94,7 @@ export default function AppDrawerView({ onClose, onNewChat, onSelectChat, active
       </div>
     </div>}
 
-    {drawerVisible && <footer className={cn("drawer-bottom pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-10 sm:px-8", searching ? "drawer-pane-out" : "drawer-pane-in")}>
+    {drawerVisible && <footer className={cn("drawer-bottom pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-10 sm:px-8", morphing && (searching ? "drawer-pane-out" : "drawer-pane-in"))}>
       <div className="pointer-events-auto mx-auto grid max-w-4xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
         <Button variant="floating" className="h-12 w-fit px-5" onClick={onNewChat}><Pencil />New chat</Button>
         <ProfileMenu floating />
