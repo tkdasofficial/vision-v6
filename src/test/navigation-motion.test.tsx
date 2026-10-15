@@ -150,3 +150,22 @@ describe("gesture flow", () => {
     expect(shouldShowTutorial({ id: "u", created_at: "2026-10-01T11:00:00Z" }, false, now)).toBe(false);
   });
 });
+describe("swipe tracking", () => {
+  it("moves the App Drawer exactly as far as the finger, from the first pixels", () => {
+    vi.useFakeTimers();
+    render(<NavigationGestures />);
+    act(() => { vi.advanceTimersByTime(1600); }); // drawer is pre-built while idle
+    vi.useRealTimers();
+    const panel = document.querySelector<HTMLElement>(".navigation-drawer-panel[data-side=left]");
+    expect(panel).not.toBeNull();
+    const start = { identifier: 1, clientX: 100, clientY: 300 };
+    fireEvent.touchStart(document.body, { touches: [start], changedTouches: [start] });
+    const at = (x: number) => { const p = { ...start, clientX: x }; act(() => { fireEvent.touchMove(document.body, { touches: [p], changedTouches: [p] }); }); };
+    const width = window.innerWidth;
+    at(106);
+    expect(panel!.style.transform).toBe(`translate3d(${(6 / width - 1) * 100}%, 0, 0)`);
+    at(107);
+    expect(panel!.style.transform).toBe(`translate3d(${(7 / width - 1) * 100}%, 0, 0)`);
+    expect(document.querySelector(".navigation-drawer")?.getAttribute("data-open")).toBe("true");
+  });
+});

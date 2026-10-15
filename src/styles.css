@@ -290,6 +290,7 @@ html:active-view-transition-type(page-to-left)::view-transition-new(root) { z-in
   to { transform: translateX(var(--page-exit-x)); }
 }
 .navigation-drawer { position: fixed; inset: 0; z-index: 45; }
+.navigation-drawer:not([data-open]) { visibility: hidden; pointer-events: none; }
 .navigation-drawer-scrim { position: absolute; inset: 0; background: var(--drawer-scrim); opacity: var(--drawer-progress, 0); }
 .navigation-drawer-panel { position: absolute; inset: 0; transform: translate3d(calc((var(--drawer-progress, 0) - 1) * 100%), 0, 0); will-change: transform; touch-action: pan-y; }
 .navigation-drawer-panel[data-side=right] { transform: translate3d(calc((1 - var(--drawer-progress, 0)) * 100%), 0, 0); }
