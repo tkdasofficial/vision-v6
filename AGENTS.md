@@ -26,4 +26,4 @@
 - Offline caching uses vite-plugin-pwa (generateSW, client build only) registered solely from `src/lib/pwa.ts`, which refuses dev, iframes, preview hosts and `?sw=off`; pages are network-first and sign-in/admin/API paths are never cached; saved chats mirror to IndexedDB (`src/lib/idb-cache.ts`) and are cleared on sign-out. Why: fast repeats, no stale code or cached private data.
 
 - Workspace pages share fade/grid controls; Settings uses Radix switches/radios. Drafts pass URL context to addChat; ProjectChatHeader uses ProjectMenu; lists sort by creation with pins first. Why: consistent UI and isolated chats.
-- NavigationGestures preserves Outlet; drawers spring. Projects pull-down targets its own view before Chat/drawer search. Why: source-scoped motion preserves streams.
+- NavigationGestures preserves Outlet and uses the same panel-settling motion for App Drawer and Projects; drawer children animate only during inline Search morphs, never on panel entrance. Projects pull-down targets its own view before Chat/drawer search. Why: a single entrance avoids stacked scaling/bounce while preserving streams.
