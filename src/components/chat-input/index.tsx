@@ -18,6 +18,7 @@ import { PLUGIN_BY_ID } from "@/lib/plugins/manifest";
 import { Plus } from "lucide-react";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import PluginPicker from "@/components/plugin-picker";
+import { isConversionRequest } from "@/lib/runtime/operations";
 
 type Props = {
   toolName?: string;

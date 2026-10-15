@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectRuntimeOp, cleanParams, outputMatches, outputName, targetFormat, isRuntimeOp } from "@/lib/runtime/operations";
+import { detectRuntimeOp, cleanParams, outputMatches, outputName, targetFormat, isRuntimeOp, isConversionRequest } from "@/lib/runtime/operations";
 import { verifyGithubOidc } from "../../auth-gateway/src/runtime";
 
 const MB = 1024 * 1024;
@@ -36,6 +36,19 @@ describe("runtime operation routing", () => {
     expect(cleanParams("checksum", { algorithms: ["md5", "sha512"], expected: "zz" })).toEqual({ algorithms: ["sha512"] });
   });
   it("parses target formats", () => { expect(targetFormat("save it as a GIF", ["gif"])).toBe("gif"); expect(targetFormat("hello", ["gif"])).toBeNull(); });
+  it("understands short and casual conversion requests", () => {
+    expect(detectRuntimeOp("png", [{ ...png, name: "a.jpg", mime: "image/jpeg" }])).toMatchObject({ operation: "image_convert", params: { target: "png" } });
+    expect(detectRuntimeOp("make it a gif", [png])).toMatchObject({ operation: "image_convert", params: { target: "gif" } });
+    expect(detectRuntimeOp("extract audio as mp3", [{ name: "v.mp4", mime: "video/mp4", size: 3 * MB }])).toMatchObject({ operation: "audio_convert", params: { target: "mp3" } });
+    expect(detectRuntimeOp("convert to flac", [{ name: "s.mp3", mime: "audio/mpeg", size: 3 * MB }])).toMatchObject({ operation: "audio_convert", params: { target: "flac" } });
+  });
+  it("keeps photos as files only when a format change is asked for", () => {
+    expect(isConversionRequest("Convert this to WebP")).toBe(true);
+    expect(isConversionRequest("jpg")).toBe(true);
+    expect(isConversionRequest("make it a png")).toBe(true);
+    expect(isConversionRequest("What is in this photo?")).toBe(false);
+    expect(isConversionRequest("make it brighter")).toBe(false);
+  });
 });
 
 describe("runtime output validation", () => {
