@@ -39,3 +39,4 @@
 - [x] Gesture flow: Chat swipes (drawer/Projects), drawer pages close to drawer, Projects removed from drawer, first-run tutorial + /guide
 - [x] Drawer pages close to Chat (no reopening recent page); Projects as swipe/tap panel from the right
 - [x] Projects page background uses the app's black (#080808) instead of gray; browser check confirms the computed color matches the app background
+- [x] App Drawer follows a swipe 1:1 with no delay (kept ready off-screen)
