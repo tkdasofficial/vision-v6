@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
-import { drawerProgress, settleDrawer, springStep, requestDrawer, requestProjects, PROJECTS_SEARCH_EVENT, DRAWER_SEARCH_EVENT, setClickDirection, consumeClickDirection } from "@/lib/navigation-motion";
+import { drawerProgress, glideProgress, settleDrawer, springStep, requestDrawer, requestProjects, PROJECTS_SEARCH_EVENT, DRAWER_SEARCH_EVENT, setClickDirection, consumeClickDirection } from "@/lib/navigation-motion";
 import { pageTransitionTypes } from "@/lib/app-motion";
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), canGoBack: vi.fn(() => true), pathname: "/chat" }));
