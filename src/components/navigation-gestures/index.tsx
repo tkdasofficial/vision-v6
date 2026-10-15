@@ -131,11 +131,14 @@ export default function NavigationGestures() {
     };
     const begin = glide ? slide : tick;
     let waited = 0;
-    let settledFrames = 0;
-    const ready = () => {
-      // Wait until the panel exists and has painted twice (after its setup work), then slide.
-      if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
-      if (settledFrames++ < 1) { frame.current = requestAnimationFrame(ready); return; }
+    let smoothFrames = 0;
+    let last = -1;
+    const ready = (now: number) => {
+      // Start only once the panel exists and two frames in a row ran on time (its setup work is
+      // done); otherwise a long setup frame would swallow the start of the slide. Capped ~0.5s.
+      smoothFrames = layer.current && last >= 0 && now - last < 26 ? smoothFrames + 1 : 0;
+      last = now;
+      if (smoothFrames < 2 && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
       if (glide) slide(); else frame.current = requestAnimationFrame(tick);
     };
     if (mounting) frame.current = requestAnimationFrame(ready);
