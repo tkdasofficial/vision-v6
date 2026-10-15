@@ -344,9 +344,10 @@ export default function NavigationGestures() {
   }, []);
   useEffect(() => {
     if (!enabled || directDrawer || prewarmed) return;
-    const w = window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-    const id = w.requestIdleCallback ? w.requestIdleCallback(() => setPrewarmed(true), { timeout: 2500 }) : window.setTimeout(() => setPrewarmed(true), 1500);
-    return () => { if (w.requestIdleCallback) w.cancelIdleCallback?.(id); else clearTimeout(id); };
+    const w = window as unknown as { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idle = typeof w.requestIdleCallback === "function";
+    const id = idle ? w.requestIdleCallback!(() => setPrewarmed(true), { timeout: 2500 }) : window.setTimeout(() => setPrewarmed(true), 1500);
+    return () => { if (idle) w.cancelIdleCallback?.(id); else clearTimeout(id); };
   }, [enabled, directDrawer, prewarmed]);
   const drawerActions = useMemo(() => ({
     onClose: () => settleRef.current(false),
