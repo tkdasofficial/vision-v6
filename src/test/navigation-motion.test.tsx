@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
-import { drawerProgress, settleDrawer, springStep, requestDrawer, requestProjects, PROJECTS_SEARCH_EVENT, DRAWER_SEARCH_EVENT, setClickDirection, consumeClickDirection } from "@/lib/navigation-motion";
+import { drawerProgress, glideProgress, settleDrawer, springStep, requestDrawer, requestProjects, PROJECTS_SEARCH_EVENT, DRAWER_SEARCH_EVENT, setClickDirection, consumeClickDirection } from "@/lib/navigation-motion";
 import { pageTransitionTypes } from "@/lib/app-motion";
 
 const mocks = vi.hoisted(() => ({ navigate: vi.fn(), canGoBack: vi.fn(() => true), pathname: "/chat" }));
@@ -74,6 +74,13 @@ describe("direction and spring rules", () => {
     expect(state.position).toBeCloseTo(1, 3);
     for (let i = 0; i < 90; i++) state = springStep(state.position, state.velocity, 0, 1 / 60);
     expect(state.position).toBeCloseTo(0, 3);
+  });
+  it("tap slides start fast, finish in 320ms and never overshoot", () => {
+    expect(glideProgress(0)).toBe(0);
+    expect(glideProgress(80)).toBeGreaterThan(0.6);
+    expect(glideProgress(320)).toBe(1);
+    expect(glideProgress(900)).toBe(1);
+    for (let ms = 0; ms <= 320; ms += 16) expect(glideProgress(ms + 16)).toBeGreaterThanOrEqual(glideProgress(ms));
   });
   it("Library enters forward and its explicit back button reverses", () => {
     expect(pageTransitionTypes({ fromLocation: { pathname: "/drawer", state: { __TSR_index: 1 } }, toLocation: { pathname: "/library", state: { __TSR_index: 2 } }, pathChanged: true })).toEqual(["page-forward"]);

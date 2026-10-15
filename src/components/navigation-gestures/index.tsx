@@ -7,7 +7,7 @@ import AppDrawerView from "@/components/app-drawer";
 import Projects from "@/pages/projects";
 import { isMotionReduced } from "@/lib/app-motion";
 import { classifyRoute, safeReturnPath } from "@/lib/route-access";
-import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
+import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
 
@@ -93,7 +93,19 @@ export default function NavigationGestures() {
       else layer.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
     };
     if (isMotionReduced()) { finish(); return; }
+    // Taps (and still releases) have no finger speed. A spring from rest starts slowly and
+    // drags, so they use the quick glide a flicked Projects swipe has; flicks keep the spring.
+    const glide = Math.abs(initialVelocity) < 0.5;
+    let from = progress.current;
+    let started = -1;
     const tick = (now: number) => {
+      if (glide) {
+        if (started < 0) { started = now; from = progress.current; }
+        const t = glideProgress(now - started, Math.abs(target - from));
+        paint(from + (target - from) * t);
+        if (t >= 1) finish(); else frame.current = requestAnimationFrame(tick);
+        return;
+      }
       // The first frame only records the clock, so a slow frame never becomes a jump.
       const next = previous < 0 ? { position: progress.current, velocity } : springStep(progress.current, velocity, target, (now - previous) / 1000);
       previous = now; velocity = next.velocity; paint(next.position);
