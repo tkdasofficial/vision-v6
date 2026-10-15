@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Match App Drawer opening to Projects; remove conflicting entrance motion and verify tap/swipe opening and search.
 - [x] Fix attachment-menu Plugins to open an added-plugins square picker immediately above the composer; 19 tests pass and signed-in desktop/mobile checks confirm square placement, scrollable added-plugin list, selection and draft preservation.
 - [x] Make shared content blocks fit short content and cap long content at a square; refine surfaces, borders and clipped-content fade without adding mobile controls. 74 regression tests pass; signed-in mobile/desktop light/dark checks confirm one-word/three-line/square sizing and full-content copying and expansion.
 - [x] Unify Markdown, text and code copy-block UI with top-left format labels; signed-in desktop/mobile chat verifies all three, clean Markdown copying, literal text copying and expanded viewing.
