@@ -7,7 +7,7 @@ import AppDrawerView from "@/components/app-drawer";
 import Projects from "@/pages/projects";
 import { isMotionReduced } from "@/lib/app-motion";
 import { classifyRoute, safeReturnPath } from "@/lib/route-access";
-import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
+import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
 
