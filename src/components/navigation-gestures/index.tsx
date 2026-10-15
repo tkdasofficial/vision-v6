@@ -75,7 +75,7 @@ export default function NavigationGestures() {
   // A running tap slide is a browser (compositor) animation, so busy chat work can't make it stutter.
   const motion = useRef<{ animations: Animation[]; from: number; to: number; start: number } | null>(null);
   const stopMotion = () => {
-    stopMotion();
+    cancelAnimationFrame(frame.current);
     const running = motion.current;
     if (!running) return;
     motion.current = null;
