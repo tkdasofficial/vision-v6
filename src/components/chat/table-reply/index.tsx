@@ -80,20 +80,11 @@ export default function TableReply({ children, node, markdown }: { children: Rea
           <span className="flex min-w-0 flex-1 items-center gap-2 truncate px-2 font-mono text-xs font-medium" title={`Table · ${rows.length} rows · ${headers.length} columns`}><Table2 className="size-4 shrink-0" aria-hidden="true" />Table</span>
           <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label={copied ? "Table copied" : "Copy table Markdown"} title={copied ? "Copied" : "Copy table Markdown"} onClick={() => copy(markdown)}>{copied ? <Check /> : <Copy />}</Button>
           <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label="Download table CSV" title="Download table CSV" onClick={download}><Download /></Button>
-          <Button variant="ghost" size="icon" className="hidden size-8 shrink-0 rounded-md md:inline-flex" aria-label="Expand table" title="Expand table" onClick={() => setOpen(true)}><Expand /></Button>
+          <Button variant="ghost" size="icon" className="size-9 shrink-0 rounded-full md:size-8 md:rounded-md" aria-label="Expand table" title="Expand table" onClick={() => setOpen(true)}><Expand /></Button>
         </header>
         <div role="region" aria-label="Scrollable table" tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
           <TableGrid data={data} sort={sort} onSort={toggleSort} />
         </div>
-        <button
-          type="button"
-          aria-label="Open table full screen"
-          className="content-block-footer flex h-7 shrink-0 cursor-zoom-in items-center justify-between gap-2 border-t border-border px-4 font-mono text-[11px] text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring"
-          onClick={() => setOpen(true)}
-        >
-          <span className="truncate">{rows.length} rows · {headers.length} columns</span>
-          <span className="shrink-0">Full screen</span>
-        </button>
       </div>
       {open && <Dialog open onOpenChange={(value) => { if (!value) setOpen(false); }}><DialogPortal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[9999] bg-background" />
