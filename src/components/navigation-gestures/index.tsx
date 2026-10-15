@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "@tanstack/react-router";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation, useNavigate } from "@/lib/router-compat";
@@ -10,6 +10,9 @@ import { classifyRoute, safeReturnPath } from "@/lib/route-access";
 import { DRAWER_EVENT, GLIDE_EASE, PROJECTS_EVENT, drawerProgress, glideDuration, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
+
+// Memoized so starting a swipe (which re-renders this component) never re-renders the chat list.
+const DrawerView = memo(AppDrawerView);
 
 function scrollsX(start: Element | null, dx: number) {
   for (let node = start; node && node !== document.body; node = node.parentElement) {
@@ -44,6 +47,10 @@ export default function NavigationGestures() {
   // Pull-down from Chat opens Search over Chat; its back button returns to Chat, not the drawer.
   const [searchFromChat, setSearchFromChat] = useState(false);
   const [side, setSide] = useState<"left" | "right">("left");
+  // The App Drawer is built once while idle and kept (hidden) off-screen, so a swipe only moves
+  // it: the first pixel of finger travel is the first pixel of drawer travel, like Projects.
+  const [prewarmed, setPrewarmed] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const sideRef = useRef<"left" | "right">("left");
   const layer = useRef<HTMLDivElement>(null);
   const progress = useRef(0);
@@ -58,14 +65,18 @@ export default function NavigationGestures() {
   current.current = { enabled, directDrawer, location, navigate, router };
   // Writes only the panel's transform and the scrim's opacity. An inherited CSS variable on the
   // layer restyled every element inside the drawer on every frame, which made it stutter.
-  const panelTransform = (value: number) => `translate3d(${(sideRef.current === "right" ? 1 - value : value - 1) * 100}%, 0, 0)`;
+  const transformFor = (panelSide: "left" | "right", value: number) => `translate3d(${(panelSide === "right" ? 1 - value : value - 1) * 100}%, 0, 0)`;
+  const panelTransform = (value: number) => transformFor(sideRef.current, value);
   const parts = (node: HTMLElement | null) => ({
-    panel: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-panel") ?? null,
+    panel: node?.querySelector<HTMLElement>(`:scope > .navigation-drawer-panel[data-side=${sideRef.current}]`) ?? null,
+    other: node?.querySelector<HTMLElement>(`:scope > .navigation-drawer-panel[data-side=${sideRef.current === "right" ? "left" : "right"}]`) ?? null,
     scrim: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim") ?? null,
   });
   const applyProgress = (node: HTMLElement | null, value: number) => {
-    const { panel, scrim } = parts(node);
+    const { panel, other, scrim } = parts(node);
     if (panel) panel.style.transform = panelTransform(value);
+    // The kept App Drawer stays parked off-screen while Projects is the moving panel.
+    if (other) { const closed = transformFor(other.dataset.side === "right" ? "right" : "left", 0); if (other.style.transform !== closed) other.style.transform = closed; }
     if (scrim) scrim.style.opacity = String(value);
   };
   const paint = (value: number) => {
@@ -89,9 +100,20 @@ export default function NavigationGestures() {
     sideRef.current = to; setSide(to);
     lastFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     opened.current = true;
+    // Reveal the kept layer right now, without waiting for React, so it moves with this touch.
+    layer.current?.setAttribute("data-open", "true");
+    paint(progress.current);
     setVisible(true);
   };
-  const dismiss = () => { opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0); };
+  const dismiss = () => {
+    const wasOpen = opened.current;
+    opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0);
+    layer.current?.removeAttribute("data-open");
+    if (wasOpen) {
+      setResetKey((key) => key + 1);
+      if (lastFocus.current?.isConnected && layer.current?.contains(document.activeElement)) lastFocus.current.focus({ preventScroll: true });
+    }
+  };
   const settle = (open: boolean, initialVelocity = 0, to?: "left" | "right") => {
     stopMotion();
     // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
@@ -175,6 +197,7 @@ export default function NavigationGestures() {
       event.preventDefault(); settleRef.current(false);
     };
     const historyBack = () => { if (opened.current) settleRef.current(false); };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape" && opened.current) { event.preventDefault(); settleRef.current(false); } };
     const down = (event: TouchPoint) => {
       if (!current.current.enabled || event.pointerType !== "touch" || !event.isPrimary || drag.current) return;
       if (document.querySelector("[role='dialog']:not([data-navigation-drawer]), [role='alertdialog'], [role='menu'][data-state='open']")) return;
@@ -208,7 +231,7 @@ export default function NavigationGestures() {
       if (!gesture || gesture.id !== event.pointerId) return;
       const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y;
       if (!gesture.active) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 5) return;
         // The touched Projects view owns pull-down search, even while layered over Chat.
         if (dy > 0 && dy >= Math.abs(dx) * 1.2 && !scrollsUp(event.target instanceof Element ? event.target : target.current)) {
           if (target.current?.closest("[data-projects-search]")) {
@@ -291,6 +314,7 @@ export default function NavigationGestures() {
     document.addEventListener(PROJECTS_EVENT, openProjects);
     document.addEventListener(`${DRAWER_EVENT}:back`, back);
     window.addEventListener("popstate", historyBack);
+    document.addEventListener("keydown", key);
     const each = (handler: (point: TouchPoint) => void, cancel = false) => (event: TouchEvent) => {
       // A second finger (pinch) cancels any swipe in progress.
       if (event.type === "touchstart" && event.touches.length > 1) { const g = drag.current; if (g) release({ ...fromTouch(event, event.changedTouches[0], true), pointerId: g.id }); return; }
@@ -308,6 +332,7 @@ export default function NavigationGestures() {
       document.removeEventListener(PROJECTS_EVENT, openProjects);
       document.removeEventListener(`${DRAWER_EVENT}:back`, back);
       window.removeEventListener("popstate", historyBack);
+      document.removeEventListener("keydown", key);
       document.removeEventListener("touchstart", onStart, true);
       document.removeEventListener("touchmove", onMove, true);
       document.removeEventListener("touchend", onEnd, true);
@@ -316,17 +341,30 @@ export default function NavigationGestures() {
       media.removeEventListener("change", preference); observer.disconnect();
     };
   }, []);
+  useEffect(() => {
+    if (!enabled || directDrawer || prewarmed) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(() => setPrewarmed(true), { timeout: 2500 }) : window.setTimeout(() => setPrewarmed(true), 1500);
+    return () => { if (w.requestIdleCallback) w.cancelIdleCallback?.(id); else clearTimeout(id); };
+  }, [enabled, directDrawer, prewarmed]);
+  const drawerActions = useMemo(() => ({
+    onClose: () => settleRef.current(false),
+    onNewChat: () => { settleRef.current(false); current.current.navigate("/chat"); },
+    onSelectChat: (id: string) => { settleRef.current(false); current.current.navigate(`/chat/${id}`); },
+  }), []);
+  const closeSearch = useMemo(() => () => settleRef.current(false), []);
   if (!enabled || directDrawer) return null;
+  const drawerOpen = visible && side === "left";
   return <>
     {!visible && <div className="navigation-edge" aria-hidden="true" />}
-    <Dialog.Root open={visible} onOpenChange={(open) => settleRef.current(open)}>
-      {visible && <Dialog.Portal><div className="navigation-drawer" ref={(node) => { layer.current = node; applyProgress(node, progress.current); }}>
-        <Dialog.Overlay className="navigation-drawer-scrim" />
-        <Dialog.Content className="navigation-drawer-panel" data-side={side} data-navigation-drawer aria-describedby={undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => { event.preventDefault(); if (lastFocus.current?.isConnected) lastFocus.current.focus({ preventScroll: true }); }}>
-          <Dialog.Title className="sr-only">{side === "right" ? "Projects" : "Workspace navigation"}</Dialog.Title>
-          {side === "right" ? <Projects onClose={() => settleRef.current(false)} /> : <AppDrawerView initialSearch={drawerSearch} onSearchBack={searchFromChat ? () => settleRef.current(false) : undefined} activeChatId={location.pathname.match(/^\/chat\/([^/]+)$/)?.[1]} onClose={() => settleRef.current(false)} onNewChat={() => { settleRef.current(false); navigate("/chat"); }} onSelectChat={(id) => { settleRef.current(false); navigate(`/chat/${id}`); }} />}
-        </Dialog.Content>
-      </div></Dialog.Portal>}
-    </Dialog.Root>
+    {(visible || prewarmed) && createPortal(<div className="navigation-drawer" data-open={visible ? "true" : undefined} ref={(node) => { layer.current = node; if (node) applyProgress(node, progress.current); }}>
+      <div className="navigation-drawer-scrim" aria-hidden="true" onClick={() => settleRef.current(false)} />
+      <div className="navigation-drawer-panel" data-side="left" data-navigation-drawer role={drawerOpen ? "dialog" : undefined} aria-modal={drawerOpen ? true : undefined} aria-label="Workspace navigation">
+        <DrawerView {...drawerActions} resetKey={resetKey} initialSearch={drawerSearch} onSearchBack={searchFromChat ? closeSearch : undefined} activeChatId={location.pathname.match(/^\/chat\/([^/]+)$/)?.[1]} />
+      </div>
+      {visible && side === "right" && <div className="navigation-drawer-panel" data-side="right" data-navigation-drawer role="dialog" aria-modal="true" aria-label="Projects">
+        <Projects onClose={drawerActions.onClose} />
+      </div>}
+    </div>, document.body)}
   </>;
 }
