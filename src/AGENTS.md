@@ -1,7 +1,7 @@
 # UI rules (src/)
 
 - The chat composer uses AI Elements PromptInput primitives; its existing file-routing callbacks remain separate from the primitive's attachment collection. Why: preserves ZIP/conversion behavior while sharing accessible input and submission controls.
-- Speech text is joined through the browser-safe appendTranscript helper, with regression tests alongside existing tests. Why: preserves typed text and whitespace across recognition updates without coupling transcription to a service.
+- Speech text is joined through the browser-safe appendTranscript helper, with regression tests. Why: preserves typed text and whitespace across recognition updates without coupling transcription to a service.
 - Drawer uses AppDrawerView in the persistent NavigationGestures overlay; protected /drawer stays a direct entry. Search is inline. Why: preserves mounted pages and streams with one drawer/search UI.
 - Incognito uses a dedicated route and workspace-only React state, bypassing history writes, background jobs, and persistent AI generators. Why: temporary messages and attachments must never reach browser storage; replies come from the stateless /api/chat route.
 - Picture/video creation pages are retired: /images and /videos (and their chat URLs) are thin legacy redirects to /chat. Why: Vision is a text-output system; media is only format-converted, never generated or edited.
