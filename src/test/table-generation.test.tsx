@@ -40,9 +40,10 @@ describe("Advanced chat tables", () => {
 
   it("updates rows while a reply streams and keeps explicit raw Markdown fenced", () => {
     const { rerender } = render(<MarkdownReply>{"| A | B |\n| --- | --- |"}</MarkdownReply>);
-    expect(screen.getByText("0 rows · 2 columns")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Scrollable table" })).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(1);
     rerender(<MarkdownReply>{"| A | B |\n| --- | --- |\n| One | Two |"}</MarkdownReply>);
-    expect(screen.getByText("1 rows · 2 columns")).toBeInTheDocument();
+    expect(screen.getAllByRole("row")).toHaveLength(2);
     rerender(<MarkdownReply>{`\x60\x60\x60text\n${table}\n\x60\x60\x60`}</MarkdownReply>);
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Text copy box" })).toBeInTheDocument();

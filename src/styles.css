@@ -388,7 +388,7 @@ button { transition-property: color, background-color, border-color, opacity, bo
 .content-block-frame {
   --block-toolbar: color-mix(in srgb, var(--cc-bg) 55%, hsl(var(--background)));
   --block-border: color-mix(in srgb, var(--cc-line) 70%, transparent);
-  --block-shadow: 0 2px 8px color-mix(in srgb, var(--cc-fg) 4%, transparent), 0 0 0 1px color-mix(in srgb, var(--cc-bg) 70%, transparent) inset;
+  --block-shadow: 0 1px 3px color-mix(in srgb, var(--cc-fg) 5%, transparent);
   border-color: var(--block-border);
   box-shadow: var(--block-shadow);
 }
