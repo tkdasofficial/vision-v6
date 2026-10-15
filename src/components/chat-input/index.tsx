@@ -157,8 +157,9 @@ const ChatInput = ({ toolName, onSend, onZipUpload, onFileConvert, onSendFiles, 
     const full = [typed, ...pasted.map((p) => p.text)].filter(Boolean).join("\n\n");
     setPasted([]);
     const chosen = plugins; setPlugins([]);
-    // With a plugin selected, an attached image is a source file for conversion, not a picture to describe.
-    const files = chosen.length && attachedImage?.file ? [...attachedFiles, attachedImage.file] : attachedFiles;
+    // With a plugin selected or a format change asked for, an attached image is a source file for conversion, not a picture to describe.
+    const asFile = !!attachedImage?.file && (chosen.length > 0 || isConversionRequest(full));
+    const files = asFile ? [...attachedFiles, attachedImage!.file!] : attachedFiles;
     if (files.length && onSendFiles) {
       onSendFiles(full || (chosen.length ? "" : "Inspect these files and tell me what they contain."), files, extras ?? { typed, pasted: [] }, chosen);
       setValue(""); finalTranscriptRef.current = ""; setAttachedFiles([]); setAttachedImage(null);
