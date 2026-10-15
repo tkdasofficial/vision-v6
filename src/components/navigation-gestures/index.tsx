@@ -118,7 +118,8 @@ export default function NavigationGestures() {
     stopMotion();
     // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
     // mounting never eats the first frames of the slide.
-    const mounting = open && !opened.current;
+    // The kept App Drawer is already built, so it can start sliding at once.
+    const mounting = open && !opened.current && !layer.current?.querySelector(`:scope > .navigation-drawer-panel[data-side=${to ?? sideRef.current}]`);
     if (open) show(to);
     const target = open ? 1 : 0;
     let velocity = initialVelocity;
