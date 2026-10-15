@@ -83,13 +83,14 @@ export function springStep(position: number, velocity: number, target: number, s
 }
 /** Duration (ms) of a full tap-driven panel slide; shorter distances take proportionally less. */
 export const GLIDE_MS = 320;
-/** CSS twin of glideProgress's ease-out curve, so the browser can run the slide off the main thread. */
-export const GLIDE_EASE = "cubic-bezier(0.25, 1, 0.5, 1)";
+/** Tap slides run as browser animations: a soft start, then a long gentle stop (no overshoot). */
+export const GLIDE_EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+export const SLIDE_MS = 400;
 export function glideDuration(distance = 1) {
-  return GLIDE_MS * Math.max(0.45, Math.min(1, distance));
+  return SLIDE_MS * Math.max(0.45, Math.min(1, distance));
 }
 /** Eased 0→1 progress of a tap-driven slide: starts at full speed, stops softly, never overshoots. */
 export function glideProgress(elapsedMs: number, distance = 1) {
-  const t = Math.min(1, Math.max(0, elapsedMs / glideDuration(distance)));
+  const t = Math.min(1, Math.max(0, elapsedMs / (GLIDE_MS * Math.max(0.45, Math.min(1, distance)))));
   return 1 - Math.pow(1 - t, 4);
 }

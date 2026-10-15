@@ -7,7 +7,7 @@ import AppDrawerView from "@/components/app-drawer";
 import Projects from "@/pages/projects";
 import { isMotionReduced } from "@/lib/app-motion";
 import { classifyRoute, safeReturnPath } from "@/lib/route-access";
-import { DRAWER_EVENT, GLIDE_EASE, PROJECTS_EVENT, drawerProgress, glideDuration, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
+import { DRAWER_EVENT, GLIDE_EASE, PROJECTS_EVENT, drawerProgress, glideDuration, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
 
@@ -73,14 +73,14 @@ export default function NavigationGestures() {
     applyProgress(layer.current, value);
   };
   // A running tap slide is a browser (compositor) animation, so busy chat work can't make it stutter.
-  const motion = useRef<{ animations: Animation[]; from: number; to: number; start: number } | null>(null);
+  const motion = useRef<{ animations: Animation[]; from: number; to: number} | null>(null);
   const stopMotion = () => {
     cancelAnimationFrame(frame.current);
     const running = motion.current;
     if (!running) return;
     motion.current = null;
     // Freeze where the slide visibly is, so a finger can catch it mid-way.
-    const t = glideProgress(performance.now() - running.start, Math.abs(running.to - running.from));
+    const t = Number(running.animations[0].effect?.getComputedTiming().progress ?? 1);
     running.animations.forEach((animation) => animation.cancel());
     paint(running.from + (running.to - running.from) * t);
   };
@@ -125,7 +125,7 @@ export default function NavigationGestures() {
       const animations = [panel.animate([{ transform: panelTransform(from) }, { transform: panelTransform(target) }], options)];
       if (scrim) animations.push(scrim.animate([{ opacity: from }, { opacity: target }], options));
       paint(target); // resting style underneath; the animation covers it until it ends
-      const running = { animations, from, to: target, start: performance.now() };
+      const running = { animations, from, to: target };
       motion.current = running;
       animations[0].onfinish = () => { if (motion.current !== running) return; motion.current = null; animations.forEach((a) => a.cancel()); finish(); };
     };
