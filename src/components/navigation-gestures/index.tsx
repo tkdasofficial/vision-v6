@@ -7,7 +7,7 @@ import AppDrawerView from "@/components/app-drawer";
 import Projects from "@/pages/projects";
 import { isMotionReduced } from "@/lib/app-motion";
 import { classifyRoute, safeReturnPath } from "@/lib/route-access";
-import { DRAWER_EVENT, PROJECTS_EVENT, drawerProgress, glideProgress, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
+import { DRAWER_EVENT, GLIDE_EASE, PROJECTS_EVENT, drawerProgress, glideDuration, gestureSurface, requestProjectsSearch, requestSearch, settleDrawer, springStep, swipeAction } from "@/lib/navigation-motion";
 
 type Drag = { id: number; x: number; y: number; lastX: number; time: number; start: number; velocity: number; kind: "drawer" | "back" | "pending" | "projects" | "to-chat" | "to-drawer"; active: boolean };
 
@@ -58,17 +58,31 @@ export default function NavigationGestures() {
   current.current = { enabled, directDrawer, location, navigate, router };
   // Writes only the panel's transform and the scrim's opacity. An inherited CSS variable on the
   // layer restyled every element inside the drawer on every frame, which made it stutter.
+  const panelTransform = (value: number) => `translate3d(${(sideRef.current === "right" ? 1 - value : value - 1) * 100}%, 0, 0)`;
+  const parts = (node: HTMLElement | null) => ({
+    panel: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-panel") ?? null,
+    scrim: node?.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim") ?? null,
+  });
   const applyProgress = (node: HTMLElement | null, value: number) => {
-    if (!node) return;
-    const panel = node.querySelector<HTMLElement>(":scope > .navigation-drawer-panel");
-    const scrim = node.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim");
-    const offset = (sideRef.current === "right" ? 1 - value : value - 1) * 100;
-    if (panel) panel.style.transform = `translate3d(${offset}%, 0, 0)`;
+    const { panel, scrim } = parts(node);
+    if (panel) panel.style.transform = panelTransform(value);
     if (scrim) scrim.style.opacity = String(value);
   };
   const paint = (value: number) => {
     progress.current = value;
     applyProgress(layer.current, value);
+  };
+  // A running tap slide is a browser (compositor) animation, so busy chat work can't make it stutter.
+  const motion = useRef<{ animations: Animation[]; from: number; to: number} | null>(null);
+  const stopMotion = () => {
+    cancelAnimationFrame(frame.current);
+    const running = motion.current;
+    if (!running) return;
+    motion.current = null;
+    // Freeze where the slide visibly is, so a finger can catch it mid-way.
+    const t = Number(running.animations[0].effect?.getComputedTiming().progress ?? 1);
+    running.animations.forEach((animation) => animation.cancel());
+    paint(running.from + (running.to - running.from) * t);
   };
   const show = (to: "left" | "right" = sideRef.current) => {
     if (opened.current) return;
@@ -79,9 +93,9 @@ export default function NavigationGestures() {
   };
   const dismiss = () => { opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0); };
   const settle = (open: boolean, initialVelocity = 0, to?: "left" | "right") => {
-    cancelAnimationFrame(frame.current);
+    stopMotion();
     // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
-    // mounting never eats the first frames of the slide (the drawer stuttered, Projects didn't).
+    // mounting never eats the first frames of the slide.
     const mounting = open && !opened.current;
     if (open) show(to);
     const target = open ? 1 : 0;
@@ -93,33 +107,43 @@ export default function NavigationGestures() {
       else layer.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
     };
     if (isMotionReduced()) { finish(); return; }
-    // Taps (and still releases) have no finger speed. A spring from rest starts slowly and
-    // drags, so they use the quick glide a flicked Projects swipe has; flicks keep the spring.
+    // Taps (and still releases) have no finger speed: they get the quick glide a flicked
+    // Projects swipe has; flicks keep the spring that continues the finger's speed.
     const glide = Math.abs(initialVelocity) < 0.5;
-    let from = progress.current;
-    let started = -1;
     const tick = (now: number) => {
-      if (glide) {
-        if (started < 0) { started = now; from = progress.current; }
-        const t = glideProgress(now - started, Math.abs(target - from));
-        paint(from + (target - from) * t);
-        if (t >= 1) finish(); else frame.current = requestAnimationFrame(tick);
-        return;
-      }
       // The first frame only records the clock, so a slow frame never becomes a jump.
       const next = previous < 0 ? { position: progress.current, velocity } : springStep(progress.current, velocity, target, (now - previous) / 1000);
       previous = now; velocity = next.velocity; paint(next.position);
       if (Math.abs(target - next.position) < 0.001 && Math.abs(velocity) < 0.01) finish();
       else frame.current = requestAnimationFrame(tick);
     };
-    let waited = 0;
-    let settledFrames = 0;
-    const ready = () => {
-      // Wait until the panel exists and has painted twice (after its setup work), then slide.
-      if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
-      frame.current = requestAnimationFrame(settledFrames++ < 1 ? ready : tick);
+    const slide = () => {
+      const { panel, scrim } = parts(layer.current);
+      const from = progress.current;
+      if (!panel || typeof panel.animate !== "function" || from === target) { finish(); return; }
+      const options: KeyframeAnimationOptions = { duration: glideDuration(Math.abs(target - from)), easing: GLIDE_EASE };
+      const animations = [panel.animate([{ transform: panelTransform(from) }, { transform: panelTransform(target) }], options)];
+      if (scrim) animations.push(scrim.animate([{ opacity: from }, { opacity: target }], options));
+      paint(target); // resting style underneath; the animation covers it until it ends
+      const running = { animations, from, to: target };
+      motion.current = running;
+      animations[0].onfinish = () => { if (motion.current !== running) return; motion.current = null; animations.forEach((a) => a.cancel()); finish(); };
     };
-    frame.current = requestAnimationFrame(mounting ? ready : tick);
+    const begin = glide ? slide : tick;
+    let waited = 0;
+    let smoothFrames = 0;
+    let last = -1;
+    const ready = (now: number) => {
+      // Start only once the panel exists and two frames in a row ran on time (its setup work is
+      // done); otherwise a long setup frame would swallow the start of the slide. Capped ~0.5s.
+      smoothFrames = layer.current && last >= 0 && now - last < 26 ? smoothFrames + 1 : 0;
+      last = now;
+      if (smoothFrames < 2 && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
+      if (glide) slide(); else frame.current = requestAnimationFrame(tick);
+    };
+    if (mounting) frame.current = requestAnimationFrame(ready);
+    else if (glide) slide();
+    else frame.current = requestAnimationFrame(begin);
   };
   settleRef.current = settle;
   const sign = () => (sideRef.current === "right" ? -1 : 1);
@@ -129,7 +153,7 @@ export default function NavigationGestures() {
     const state = location.state as { __TSR_index?: number; __visionOpenDrawer?: boolean; __visionOpenProjects?: boolean } | undefined;
     const prev = previous.current;
     previous.current = { path: location.pathname, index: state?.__TSR_index };
-    cancelAnimationFrame(frame.current); drag.current = null; dismiss();
+    stopMotion(); drag.current = null; dismiss();
     // Closing Library/Plugins/Settings returns to the App Drawer, already open.
     const backFromDrawerPage = prev && gestureSurface(prev.path) === "drawer-page" && state?.__TSR_index !== undefined && prev.index !== undefined && state.__TSR_index < prev.index;
     if (enabled && gestureSurface(location.pathname) === "chat" && (state?.__visionOpenDrawer || backFromDrawerPage)) { show("left"); paint(1); }
@@ -164,7 +188,7 @@ export default function NavigationGestures() {
       const drawer = opened.current || current.current.directDrawer;
       if (!drawer && gestureSurface(current.current.location.pathname) !== "other") {
         // Chat, Projects and drawer pages: swipe from anywhere, except horizontally scrolling content.
-        cancelAnimationFrame(frame.current);
+        stopMotion();
         target.current = event.target;
         drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, time: performance.now(), start: 0, velocity: 0, kind: "pending", active: false };
         return;
@@ -176,7 +200,7 @@ export default function NavigationGestures() {
         ancestor = ancestor.parentElement;
       }
       if (!drawer && !edge && !current.current.router.history.canGoBack()) return;
-      cancelAnimationFrame(frame.current);
+      stopMotion();
       drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, lastX: event.clientX, time: performance.now(), start: current.current.directDrawer ? 1 : opened.current ? progress.current : 0, velocity: 0, kind: drawer || edge ? "drawer" : "back", active: false };
     };
     const move = (event: TouchPoint) => {
@@ -279,7 +303,7 @@ export default function NavigationGestures() {
     document.addEventListener("touchcancel", onCancel, true);
     document.addEventListener("click", click, true);
     return () => {
-      cancelAnimationFrame(frame.current);
+      stopMotion();
       document.removeEventListener(DRAWER_EVENT, open);
       document.removeEventListener(PROJECTS_EVENT, openProjects);
       document.removeEventListener(`${DRAWER_EVENT}:back`, back);
