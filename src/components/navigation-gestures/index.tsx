@@ -56,9 +56,19 @@ export default function NavigationGestures() {
   const lastFocus = useRef<HTMLElement | null>(null);
   const current = useRef({ enabled, directDrawer, location, navigate, router });
   current.current = { enabled, directDrawer, location, navigate, router };
+  // Writes only the panel's transform and the scrim's opacity. An inherited CSS variable on the
+  // layer restyled every element inside the drawer on every frame, which made it stutter.
+  const applyProgress = (node: HTMLElement | null, value: number) => {
+    if (!node) return;
+    const panel = node.querySelector<HTMLElement>(":scope > .navigation-drawer-panel");
+    const scrim = node.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim");
+    const offset = (sideRef.current === "right" ? 1 - value : value - 1) * 100;
+    if (panel) panel.style.transform = `translate3d(${offset}%, 0, 0)`;
+    if (scrim) scrim.style.opacity = String(value);
+  };
   const paint = (value: number) => {
     progress.current = value;
-    layer.current?.style.setProperty("--drawer-progress", String(value));
+    applyProgress(layer.current, value);
   };
   const show = (to: "left" | "right" = sideRef.current) => {
     if (opened.current) return;
@@ -273,7 +283,7 @@ export default function NavigationGestures() {
   return <>
     {!visible && <div className="navigation-edge" aria-hidden="true" />}
     <Dialog.Root open={visible} onOpenChange={(open) => settleRef.current(open)}>
-      {visible && <Dialog.Portal><div className="navigation-drawer" ref={(node) => { layer.current = node; node?.style.setProperty("--drawer-progress", String(progress.current)); }}>
+      {visible && <Dialog.Portal><div className="navigation-drawer" ref={(node) => { layer.current = node; applyProgress(node, progress.current); }}>
         <Dialog.Overlay className="navigation-drawer-scrim" />
         <Dialog.Content className="navigation-drawer-panel" data-side={side} data-navigation-drawer aria-describedby={undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => { event.preventDefault(); if (lastFocus.current?.isConnected) lastFocus.current.focus({ preventScroll: true }); }}>
           <Dialog.Title className="sr-only">{side === "right" ? "Projects" : "Workspace navigation"}</Dialog.Title>
