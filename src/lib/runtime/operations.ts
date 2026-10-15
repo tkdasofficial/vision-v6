@@ -58,6 +58,23 @@ export function targetFormat(prompt: string, allowed: readonly string[]): string
   return allowed.includes(t) ? t : null;
 }
 
+const FORMAT_WORD = /\b(?:to|into|as|make it|make this)\s+(?:an?\s+)?\.?([a-z0-9]{2,5})\b/;
+const BARE_FORMAT = /^\s*(?:to\s+|as\s+|into\s+)?\.?([a-z0-9]{2,5})(?:\s+(?:format|file|please))?\s*[.!]?\s*$/;
+/** The format word a request names ("convert to webp", "as .mp3", "make it a gif", or just "png"). */
+export function requestedFormatWord(prompt: string): string | undefined {
+  const p = prompt.toLowerCase();
+  return p.match(FORMAT_WORD)?.[1] ?? (BARE_FORMAT.test(p) && canonicalId(p.match(BARE_FORMAT)![1]) ? p.match(BARE_FORMAT)![1] : undefined);
+}
+/** True when a message asks to change a file's format (browser-safe; used to keep attached photos as files). */
+export function isConversionRequest(prompt: string): boolean {
+  const p = prompt.toLowerCase();
+  if (/\b(convert|conversion|transcode|re-?encode)\b/.test(p)) return true;
+  if (/\b(change|turn|save|export|make|format)\b/.test(p) && !!requestedFormatWord(p) && !!canonicalId(requestedFormatWord(p)!)) return true;
+  if (/\bextract\b.*\baudio\b/.test(p)) return true;
+  const bare = p.match(BARE_FORMAT)?.[1];
+  return !!bare && !!canonicalId(bare);
+}
+
 export type RuntimeRequest = { operation: RuntimeOpId; params: Record<string, unknown>; fileIndex: number };
 
 /** Decides whether a chat request with attachments is a registered background job. Returns null for anything else. */
@@ -65,11 +82,11 @@ export function detectRuntimeOp(prompt: string, files: { name: string; mime: str
   if (files.length !== 1) return null;
   const f = files[0];
   const p = prompt.toLowerCase();
-  const wantsConvert = /\b(convert|conversion|change|turn|save|export|transcode)\b/.test(p) || /^\s*(to|as|into)\s+\w+/.test(p);
+  const wantsConvert = isConversionRequest(prompt);
   if (wantsConvert && (isImageFile(f.name, f.mime) || isVideoFile(f.name, f.mime))) {
     const video = isVideoFile(f.name, f.mime);
     const op = RUNTIME_OPS[video ? "video_convert" : "image_convert"];
-    const any = p.match(/\b(?:to|into|as)\s+\.?([a-z0-9]{2,5})\b/)?.[1];
+    const any = requestedFormatWord(p);
     const target = targetFormat(prompt, op.targets!);
     if (!target && any && canonicalId(any)) { /* fall through to the format registry below */ }
     else if (!target) {
@@ -84,7 +101,7 @@ export function detectRuntimeOp(prompt: string, files: { name: string; mime: str
   }
   if (wantsConvert) {
     const fmt = formatOfName(f.name);
-    const word = p.match(/\b(?:to|into|as)\s+(?:an?\s+)?\.?([a-z0-9.]{2,8})\b/)?.[1];
+    const word = requestedFormatWord(p);
     const tgt = word ? canonicalId(word.replace(/\.$/, "")) : null;
     if (fmt && tgt) {
       const r = routeConversion(fmt.id, tgt);
