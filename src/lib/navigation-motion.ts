@@ -69,8 +69,15 @@ export function settleDrawer(progress: number, velocity: number): boolean {
   return progress + velocity * 0.18 > 0.5;
 }
 export function springStep(position: number, velocity: number, target: number, seconds: number) {
-  const dt = Math.min(seconds, 0.032);
+  // A slow frame advances at most 20ms, so a hiccup slows the slide instead of making it jump.
+  let remaining = Math.min(Math.max(seconds, 0), 0.02);
   // Over-damped (damping > 2√320 ≈ 35.8): glides to rest like the Projects page, never bounces.
-  const nextVelocity = velocity + ((target - position) * 320 - velocity * 40) * dt;
-  return { position: Math.min(1, Math.max(0, position + nextVelocity * dt)), velocity: nextVelocity };
+  // Small sub-steps keep the curve identical at any frame rate.
+  while (remaining > 1e-6) {
+    const dt = Math.min(remaining, 1 / 240);
+    velocity += ((target - position) * 320 - velocity * 40) * dt;
+    position = Math.min(1, Math.max(0, position + velocity * dt));
+    remaining -= dt;
+  }
+  return { position, velocity };
 }

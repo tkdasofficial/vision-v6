@@ -56,9 +56,19 @@ export default function NavigationGestures() {
   const lastFocus = useRef<HTMLElement | null>(null);
   const current = useRef({ enabled, directDrawer, location, navigate, router });
   current.current = { enabled, directDrawer, location, navigate, router };
+  // Writes only the panel's transform and the scrim's opacity. An inherited CSS variable on the
+  // layer restyled every element inside the drawer on every frame, which made it stutter.
+  const applyProgress = (node: HTMLElement | null, value: number) => {
+    if (!node) return;
+    const panel = node.querySelector<HTMLElement>(":scope > .navigation-drawer-panel");
+    const scrim = node.querySelector<HTMLElement>(":scope > .navigation-drawer-scrim");
+    const offset = (sideRef.current === "right" ? 1 - value : value - 1) * 100;
+    if (panel) panel.style.transform = `translate3d(${offset}%, 0, 0)`;
+    if (scrim) scrim.style.opacity = String(value);
+  };
   const paint = (value: number) => {
     progress.current = value;
-    layer.current?.style.setProperty("--drawer-progress", String(value));
+    applyProgress(layer.current, value);
   };
   const show = (to: "left" | "right" = sideRef.current) => {
     if (opened.current) return;
@@ -70,10 +80,13 @@ export default function NavigationGestures() {
   const dismiss = () => { opened.current = false; setVisible(false); setDrawerSearch(false); setSearchFromChat(false); paint(0); };
   const settle = (open: boolean, initialVelocity = 0, to?: "left" | "right") => {
     cancelAnimationFrame(frame.current);
+    // A tap opens a panel that isn't mounted yet: build and paint it off-screen first, so
+    // mounting never eats the first frames of the slide (the drawer stuttered, Projects didn't).
+    const mounting = open && !opened.current;
     if (open) show(to);
     const target = open ? 1 : 0;
     let velocity = initialVelocity;
-    let previous = performance.now();
+    let previous = -1;
     const finish = () => {
       paint(target);
       if (!open) dismiss();
@@ -81,12 +94,20 @@ export default function NavigationGestures() {
     };
     if (isMotionReduced()) { finish(); return; }
     const tick = (now: number) => {
-      const next = springStep(progress.current, velocity, target, (now - previous) / 1000);
+      // The first frame only records the clock, so a slow frame never becomes a jump.
+      const next = previous < 0 ? { position: progress.current, velocity } : springStep(progress.current, velocity, target, (now - previous) / 1000);
       previous = now; velocity = next.velocity; paint(next.position);
       if (Math.abs(target - next.position) < 0.001 && Math.abs(velocity) < 0.01) finish();
       else frame.current = requestAnimationFrame(tick);
     };
-    frame.current = requestAnimationFrame(tick);
+    let waited = 0;
+    let settledFrames = 0;
+    const ready = () => {
+      // Wait until the panel exists and has painted twice (after its setup work), then slide.
+      if (!layer.current && waited++ < 30) { frame.current = requestAnimationFrame(ready); return; }
+      frame.current = requestAnimationFrame(settledFrames++ < 1 ? ready : tick);
+    };
+    frame.current = requestAnimationFrame(mounting ? ready : tick);
   };
   settleRef.current = settle;
   const sign = () => (sideRef.current === "right" ? -1 : 1);
@@ -263,7 +284,7 @@ export default function NavigationGestures() {
   return <>
     {!visible && <div className="navigation-edge" aria-hidden="true" />}
     <Dialog.Root open={visible} onOpenChange={(open) => settleRef.current(open)}>
-      {visible && <Dialog.Portal><div className="navigation-drawer" ref={(node) => { layer.current = node; node?.style.setProperty("--drawer-progress", String(progress.current)); }}>
+      {visible && <Dialog.Portal><div className="navigation-drawer" ref={(node) => { layer.current = node; applyProgress(node, progress.current); }}>
         <Dialog.Overlay className="navigation-drawer-scrim" />
         <Dialog.Content className="navigation-drawer-panel" data-side={side} data-navigation-drawer aria-describedby={undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => { event.preventDefault(); if (lastFocus.current?.isConnected) lastFocus.current.focus({ preventScroll: true }); }}>
           <Dialog.Title className="sr-only">{side === "right" ? "Projects" : "Workspace navigation"}</Dialog.Title>
