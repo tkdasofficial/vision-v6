@@ -386,17 +386,19 @@ button { transition-property: color, background-color, border-color, opacity, bo
 .code-canvas header button, .code-canvas header span { color: var(--cc-fg); }
 .content-block { container-type: inline-size; }
 .content-block-frame {
-  --block-toolbar: color-mix(in srgb, var(--cc-bg) 55%, hsl(var(--background)));
-  --block-border: color-mix(in srgb, var(--cc-line) 70%, transparent);
-  --block-shadow: 0 1px 3px color-mix(in srgb, var(--cc-fg) 5%, transparent);
+  /* Code-canvas tokens are optional: blocks without .code-canvas (tables) fall back to theme colours. */
+  --block-toolbar: color-mix(in srgb, var(--cc-bg, hsl(var(--background))) 55%, hsl(var(--background)));
+  --block-border: color-mix(in srgb, var(--cc-line, hsl(var(--border))) 70%, transparent);
+  --block-shadow: 0 1px 3px color-mix(in srgb, var(--cc-fg, hsl(var(--foreground))) 5%, transparent);
   border-color: var(--block-border);
-  box-shadow: var(--block-shadow);
+  box-shadow: none;
 }
+.code-canvas.content-block-frame { box-shadow: var(--block-shadow); }
 .content-block-header, .content-block-footer { background: var(--block-toolbar); border-color: var(--block-border); }
 .content-block-frame .content-block-header { border-color: var(--block-border); }
 .content-block-body > div > :first-child { margin-top: 0; }
 .content-block-body > div > :last-child { margin-bottom: 0; }
-.content-block-fade { background: linear-gradient(to bottom, transparent, var(--cc-bg)); }
+.content-block-fade { background: linear-gradient(to bottom, transparent, var(--cc-bg, hsl(var(--background)))); }
 .code-viewer { background: var(--cc-bg); color: var(--cc-fg); }
 .code-viewer section[aria-label="Preview panel"], .code-viewer .preview-workspace, .code-viewer .preview-frame { background: var(--cc-bg); color: var(--cc-fg); }
 .code-viewer-header { background: var(--cc-bg); }
